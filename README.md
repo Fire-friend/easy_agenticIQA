@@ -1,5 +1,9 @@
 # AgenticIQA
 
+> **⚠️ IMPORTANT NOTICE**
+> This is an **unofficial reproduction** of the AgenticIQA paper. This codebase is developed independently and is **NOT** the official implementation by the original authors.
+> 本项目为 **非官方复现代码**，非原作者官方实现。
+
 **AgenticIQA** is a modular agentic framework for Image Quality Assessment (IQA) that integrates vision-language models (VLMs) with traditional IQA tools. The system uses a **Planner-Executor-Summarizer** architecture to provide interpretable, query-aware quality assessment with human-aligned explanations.
 
 ## Overview
