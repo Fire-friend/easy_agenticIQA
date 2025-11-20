@@ -75,6 +75,9 @@ Thumbs.db
 *.ckpt
 *.safetensors
 
+# Claude Code Configuration (exclude from commits)
+.claude/
+
 # Memory Bank System (exclude from commits)
 CLAUDE.md
 CLAUDE-*.md
