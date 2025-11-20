@@ -87,6 +87,11 @@ openspec/
 docs/
 outputs/
 
+# Markdown Files (exclude all except README)
+*.md
+!README.md
+!*/README.md
+
 # Keep These
 !configs/*.yaml
 !data/processed/*.jsonl
