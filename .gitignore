@@ -82,6 +82,11 @@ Thumbs.db
 CLAUDE.md
 CLAUDE-*.md
 
+# Project Documentation and Outputs (exclude from commits)
+openspec/
+docs/
+outputs/
+
 # Keep These
 !configs/*.yaml
 !data/processed/*.jsonl
