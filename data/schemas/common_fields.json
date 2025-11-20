@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Common Field Definitions",
+  "description": "Shared field definitions for AgenticIQA dataset manifests",
+  "definitions": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+_[0-9]+$",
+      "description": "Sample identifier following pattern: <dataset>_<id>"
+    },
+    "file_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative or absolute file path to image"
+    },
+    "mos_score": {
+      "type": "number",
+      "description": "Mean Opinion Score for image quality"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "val", "test"],
+      "description": "Dataset split designation"
+    },
+    "dataset_name": {
+      "type": "string",
+      "enum": ["tid2013", "bid", "agiqa-3k", "agenticiqa-eval"],
+      "description": "Name of the dataset"
+    }
+  }
+}

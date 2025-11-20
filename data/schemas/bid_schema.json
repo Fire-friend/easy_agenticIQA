@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BID Dataset Manifest Schema",
+  "description": "Schema for BID No-Reference IQA dataset manifests",
+  "type": "object",
+  "required": ["sample_id", "dataset", "image_path", "mos"],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^bid_[0-9]{4}$",
+      "description": "Unique sample identifier (e.g., bid_0001)"
+    },
+    "dataset": {
+      "type": "string",
+      "const": "bid",
+      "description": "Dataset name constant"
+    },
+    "image_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to distorted image (NR-IQA, no reference)"
+    },
+    "mos": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Mean Opinion Score (1-5 scale)"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "val", "test"],
+      "description": "Dataset split"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "distortion_type": {
+          "type": "string",
+          "description": "Type of authentic distortion (if known)"
+        },
+        "image_id": {
+          "type": "string",
+          "description": "Original image identifier"
+        }
+      }
+    }
+  }
+}

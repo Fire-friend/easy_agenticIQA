@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgenticIQA-Eval Dataset Manifest Schema",
+  "description": "Schema for AgenticIQA-Eval MCQ evaluation dataset manifests",
+  "type": "object",
+  "required": ["sample_id", "dataset", "question", "options", "answer", "task_type", "reference_mode"],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^agenticiqa_eval_[0-9]{4}$",
+      "description": "Unique sample identifier (e.g., agenticiqa_eval_0001)"
+    },
+    "dataset": {
+      "type": "string",
+      "const": "agenticiqa-eval",
+      "description": "Dataset name constant"
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MCQ question text"
+    },
+    "options": {
+      "type": "object",
+      "required": ["A", "B", "C", "D"],
+      "properties": {
+        "A": {"type": "string"},
+        "B": {"type": "string"},
+        "C": {"type": "string"},
+        "D": {"type": "string"}
+      },
+      "description": "Four-option multiple choice answers"
+    },
+    "answer": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"],
+      "description": "Correct answer key"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": ["planner", "executor_distortion", "executor_tool", "summarizer"],
+      "description": "Which module capability is being tested"
+    },
+    "reference_mode": {
+      "type": "string",
+      "enum": ["FR", "NR"],
+      "description": "Full-Reference or No-Reference mode"
+    },
+    "image_path": {
+      "type": "string",
+      "description": "Path to distorted/test image"
+    },
+    "reference_path": {
+      "type": "string",
+      "description": "Path to reference image (if FR mode)"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "val", "test"],
+      "default": "test",
+      "description": "Dataset split"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "question_type": {
+          "type": "string",
+          "enum": ["What", "How", "YesNo", "Which"],
+          "description": "Linguistic type of question"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["easy", "medium", "hard"],
+          "description": "Question difficulty level"
+        },
+        "distortion_type": {
+          "type": "string",
+          "description": "Ground truth distortion type"
+        }
+      }
+    }
+  }
+}

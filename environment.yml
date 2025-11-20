@@ -1,0 +1,48 @@
+# AgenticIQA Conda Environment
+# Usage: conda env create -f environment.yml
+
+name: agenticIQA
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pytorch-cuda=12.1
+  - pip
+
+  # Install remaining dependencies via pip
+  - pip:
+    - torch==2.3.0
+    - torchvision==0.18.0
+    - transformers==4.42.0
+    - accelerate==0.31.0
+    - bitsandbytes==0.43.1
+    - langgraph
+    - langchain-core
+    - langchain-openai
+    - langchain-anthropic
+    - pydantic==2.7.1
+    - pyiqa
+    - opencv-python
+    - pillow
+    - numpy
+    - scipy
+    - scikit-image
+    - einops
+    - openai==1.35.7
+    - anthropic==0.30.0
+    - google-genai
+    - qwen-vl-utils==0.0.8
+    - typer
+    - rich
+    - loguru
+    - pyyaml
+    - tqdm
+    - pytest
+    - pytest-cov
+
+# Note: For CPU-only installation, remove pytorch-cuda=12.1
+# and install CPU version of PyTorch via pip

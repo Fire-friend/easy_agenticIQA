@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AGIQA-3K Dataset Manifest Schema",
+  "description": "Schema for AGIQA-3K AI-Generated Image Quality Assessment dataset manifests",
+  "type": "object",
+  "required": ["sample_id", "dataset", "image_path", "mos"],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^agiqa3k_[0-9]{4}$",
+      "description": "Unique sample identifier (e.g., agiqa3k_0001)"
+    },
+    "dataset": {
+      "type": "string",
+      "const": "agiqa-3k",
+      "description": "Dataset name constant"
+    },
+    "image_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to AI-generated image"
+    },
+    "mos": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Mean Opinion Score (1-5 scale)"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "val", "test"],
+      "description": "Dataset split"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "generator_model": {
+          "type": "string",
+          "description": "AI model used to generate the image (e.g., DALL-E, Stable Diffusion)"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Text prompt used for generation"
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Random seed for generation (if available)"
+        },
+        "sampling_steps": {
+          "type": "integer",
+          "description": "Number of diffusion steps"
+        },
+        "guidance_scale": {
+          "type": "number",
+          "description": "Guidance scale parameter"
+        },
+        "distortion_type": {
+          "type": "string",
+          "enum": ["authentic", "compression", "color", "blur", "noise"],
+          "description": "Type of distortion (if post-processed)"
+        }
+      }
+    }
+  }
+}

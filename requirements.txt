@@ -1,0 +1,49 @@
+# AgenticIQA Requirements
+# Phase 1: Environment Setup Dependencies
+
+# Core Deep Learning Framework (CUDA 12.1)
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.3.0
+torchvision==0.18.0
+
+# Transformers and Model Loading
+transformers==4.42.0
+accelerate==0.31.0
+bitsandbytes==0.43.1
+
+# LangGraph Agent Framework
+langgraph
+langchain-core>=1.0.0,<2.0.0
+langchain-openai>=1.0.0,<2.0.0
+langchain-anthropic>=1.0.0,<2.0.0
+
+# Data Validation and Models
+pydantic==2.7.1
+
+# IQA Tools and Image Processing
+pyiqa
+opencv-python
+pillow
+numpy
+scipy
+scikit-image
+einops
+
+# API Clients for VLMs
+openai>=2.0.0,<3.0.0  # Updated for httpx 0.28+ compatibility
+anthropic>=0.72.0,<1.0.0  # Updated for compatibility
+google-genai  # Google's new recommended library (requires httpx>=0.28.1)
+httpx>=0.28.1,<1.0.0  # Required by google-genai and compatible with openai 2.x
+qwen-vl-utils==0.0.8
+
+# Utilities
+typer
+rich
+loguru
+pyyaml
+tqdm
+python-dotenv
+
+# Development and Testing (optional)
+pytest
+pytest-cov

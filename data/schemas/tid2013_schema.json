@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TID2013 Dataset Manifest Schema",
+  "description": "Schema for TID2013 Full-Reference IQA dataset manifests",
+  "type": "object",
+  "required": ["sample_id", "dataset", "distorted_path", "reference_path", "mos"],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^tid2013_[0-9]{4}$",
+      "description": "Unique sample identifier (e.g., tid2013_0001)"
+    },
+    "dataset": {
+      "type": "string",
+      "const": "tid2013",
+      "description": "Dataset name constant"
+    },
+    "distorted_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to distorted image"
+    },
+    "reference_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to reference (pristine) image"
+    },
+    "mos": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 9,
+      "description": "Mean Opinion Score (0-9 scale)"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "val", "test"],
+      "default": "test",
+      "description": "Dataset split"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "distortion_type": {
+          "type": "string",
+          "enum": [
+            "JPEG", "JPEG2000", "JPEG transmission errors", "JPEG2000 transmission errors",
+            "Non eccentricity pattern noise", "Local block-wise distortions",
+            "Mean shift", "Contrast change",
+            "Additive Gaussian noise", "Spatially correlated noise",
+            "Masked noise", "High frequency noise", "Impulse noise", "Quantization noise",
+            "Gaussian blur", "Image denoising", "JPEG deblocking",
+            "Chromatic aberrations", "Sparse sampling and reconstruction",
+            "Comfort noise", "Lossy compression of noisy images",
+            "Image color quantization with dither", "Chromatic shift", "Intensity shift"
+          ],
+          "description": "Type of distortion applied"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Distortion level (1-5, higher = more distortion)"
+        },
+        "reference_id": {
+          "type": "string",
+          "pattern": "^I[0-9]{2}$",
+          "description": "Reference image ID (e.g., I01)"
+        }
+      }
+    }
+  }
+}

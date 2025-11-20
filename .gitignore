@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# PyTest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and Runtime Data
+logs/
+*.log
+
+# Data and Cache
+data/cache/
+data/raw/*/
+!data/raw/.gitkeep
+iqa_tools/weights/
+!iqa_tools/weights/.gitkeep
+
+# Sensitive Files
+.env
+.env.local
+.env.*.local
+*.key
+*credentials*.json
+*secrets*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Temporary Files
+*.tmp
+*.bak
+
+# Model Checkpoints (large files)
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# Memory Bank System (exclude from commits)
+CLAUDE.md
+CLAUDE-*.md
+
+# Keep These
+!configs/*.yaml
+!data/processed/*.jsonl

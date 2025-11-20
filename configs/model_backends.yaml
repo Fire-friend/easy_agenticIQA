@@ -1,0 +1,45 @@
+# Model Backend Configuration
+# This file defines the VLM backends for each module in the AgenticIQA pipeline
+
+# Planner module configuration
+planner:
+  backend: openai.gemini-2.5-flash-lite  # Options: openai.gemini-2.5-flash-lite, anthropic.claude-3.5-sonnet, qwen2.5-vl-local
+  temperature: 0.0
+  max_tokens: 2048
+  top_p: 0.1
+
+# Executor module configuration
+executor:
+  backend: openai.gemini-2.5-flash-lite  # Options: openai.gemini-2.5-flash-lite, qwen2.5-vl-local, anthropic.claude-3.5-sonnet
+  temperature: 0.0
+  max_tokens: 4096
+  top_p: 0.1
+
+# Summarizer module configuration
+summarizer:
+  backend: openai.gemini-2.5-flash-lite  # Options: openai.gemini-2.5-flash-lite, anthropic.claude-3.5-sonnet, qwen2.5-vl-local
+  temperature: 0.0
+  max_tokens: 2048
+  top_p: 0.1
+
+# API Base URLs (optional, can be overridden by environment variables)
+# If not specified, uses default endpoints
+api_endpoints:
+  openai_base_url: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+  anthropic_base_url: ${ANTHROPIC_BASE_URL:-https://api.anthropic.com}
+  google_api_base_url: ${GOOGLE_API_BASE_URL:-}
+
+# Model-specific configurations
+model_configs:
+  # Local model configurations (if using local inference)
+  qwen2.5-vl-local:
+    model_path: ${QWEN_MODEL_PATH:-}
+    device: cuda
+    precision: fp16
+    max_memory: 24GB
+
+  # Alternative models (for fallback scenarios)
+  alternatives:
+    - openai.gemini-2.5-flash-lite  # Cheaper alternative for development
+    - anthropic.claude-3-opus  # Higher quality alternative
+    - google.gemini-pro-vision  # Google's vision model
