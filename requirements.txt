@@ -44,6 +44,10 @@ pyyaml
 tqdm
 python-dotenv
 
+# FastAPI REST API
+fastapi>=0.100.0,<1.0.0
+uvicorn[standard]>=0.23.0,<1.0.0
+
 # Development and Testing (optional)
 pytest
 pytest-cov

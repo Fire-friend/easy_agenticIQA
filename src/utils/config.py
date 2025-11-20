@@ -230,6 +230,31 @@ def load_pipeline_config(config_path: Optional[Path] = None) -> AgenticIQAConfig
         raise ValueError(f"Invalid pipeline configuration: {e}")
 
 
+def load_config(config_path: str) -> Dict[str, Any]:
+    """
+    Generic function to load any YAML configuration file.
+
+    Args:
+        config_path: Path to YAML configuration file (string or Path)
+
+    Returns:
+        Configuration dictionary with environment variables interpolated
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        yaml.YAMLError: If YAML syntax is invalid
+    """
+    path = Path(config_path)
+
+    # Load YAML
+    config = load_yaml_config(path)
+
+    # Interpolate environment variables
+    config = interpolate_env_vars(config)
+
+    return config
+
+
 def merge_configs(*configs: Dict[str, Any]) -> Dict[str, Any]:
     """
     Merge multiple configuration dictionaries with later overriding earlier.

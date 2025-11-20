@@ -432,6 +432,11 @@ def summarizer_node(
     logger.info("=" * 60)
 
     try:
+        # Check for upstream errors
+        if "error" in state:
+            logger.error(f"Skipping Summarizer due to upstream error: {state['error']}")
+            return {"error": state["error"]}
+
         # Check prerequisites
         if "plan" not in state:
             error_msg = "No plan found in state, Summarizer cannot proceed"

@@ -385,6 +385,11 @@ def executor_node(
     reference_path = state.get("reference_path")
     plan = state.get("plan")
 
+    # Check for upstream errors
+    if "error" in state:
+        logger.error(f"Skipping Executor due to upstream error: {state['error']}")
+        return {"error": state["error"]}
+
     if plan is None:
         error_msg = "No plan found in state. Planner must run before Executor."
         logger.error(error_msg)
