@@ -233,6 +233,9 @@ def tool_selection_subtask(
     # Format tool descriptions for VLM
     tool_descriptions = {}
     for tool_name, metadata in tool_registry.tools.items():
+        # Skip comment fields (keys starting with _)
+        if tool_name.startswith('_'):
+            continue
         tool_descriptions[tool_name] = {
             "type": metadata['type'],
             "strengths": metadata.get('strengths', [])

@@ -1,92 +1,291 @@
 {
+  "_comment": "IQA tool metadata with 5-parameter logistic transformation coefficients fitted on KADID-10k dataset (Sheikh et al., 2006). See AgenticIQA paper Table 5 and docs/paper_fusion.md for parameter sources.",
+
   "TOPIQ_FR": {
     "type": "FR",
     "strengths": ["Blurs", "Color distortions", "Compression", "Noise", "Brightness change", "Sharpness", "Contrast"],
     "logistic_params": {
-      "beta1": 5.0,
-      "beta2": 1.0,
-      "beta3": 0.5,
-      "beta4": 0.1
+      "beta1": 21.73,
+      "beta2": 0.1147,
+      "beta3": 0.4721,
+      "beta4": 3.5654,
+      "beta5": 1.0094
     }
   },
-  "QAlign": {
-    "type": "NR",
-    "strengths": ["Blurs", "Color distortions", "Noise", "Brightness change", "Spatial distortions", "Sharpness"],
+
+  "AHIQ": {
+    "type": "FR",
+    "strengths": ["Blurs", "Compression", "Noise"],
     "logistic_params": {
-      "beta1": 5.0,
-      "beta2": 1.0,
-      "beta3": 3.0,
-      "beta4": 0.5
+      "beta1": 0.4280,
+      "beta2": -592.6356,
+      "beta3": -2.4819,
+      "beta4": 3.7677,
+      "beta5": 1.6143
     }
   },
+
+  "FSIM": {
+    "type": "FR",
+    "strengths": ["Color distortions", "Sharpness"],
+    "logistic_params": {
+      "beta1": 265.7031,
+      "beta2": 23.2940,
+      "beta3": 1.2003,
+      "beta4": 1.9193,
+      "beta5": 133.0061
+    }
+  },
+
   "LPIPS": {
     "type": "FR",
-    "strengths": [],
+    "strengths": ["Blurs", "Color distortions", "Noise"],
     "logistic_params": {
-      "beta1": 1.0,
-      "beta2": 5.0,
-      "beta3": 0.3,
-      "beta4": 0.1
+      "beta1": -2.0915,
+      "beta2": 3.7543,
+      "beta3": -28.0133,
+      "beta4": -4.7251,
+      "beta5": 4.9710
     }
   },
+
   "DISTS": {
     "type": "FR",
     "strengths": ["Color distortions", "Compression", "Sharpness"],
     "logistic_params": {
-      "beta1": 1.0,
-      "beta2": 5.0,
-      "beta3": 0.2,
-      "beta4": 0.05
+      "beta1": -6.3380,
+      "beta2": -7.0362,
+      "beta3": -147.7936,
+      "beta4": -8.4514,
+      "beta5": 1.0753
     }
   },
-  "BRISQUE": {
-    "type": "NR",
+
+  "WaDIQaM_FR": {
+    "type": "FR",
+    "strengths": ["Blurs", "Compression"],
+    "logistic_params": {
+      "beta1": 41.8259,
+      "beta2": 0.0997,
+      "beta3": -0.3064,
+      "beta4": 23.1826,
+      "beta5": 3.5943
+    }
+  },
+
+  "GMSD": {
+    "type": "FR",
+    "strengths": ["Color distortions", "Noise"],
+    "logistic_params": {
+      "beta1": -5.9925,
+      "beta2": -23.3876,
+      "beta3": -59.6895,
+      "beta4": -13.8274,
+      "beta5": 1.0789
+    }
+  },
+
+  "SSIM": {
+    "type": "FR",
     "strengths": ["Blurs", "Compression", "Noise"],
     "logistic_params": {
-      "beta1": 1.0,
-      "beta2": 5.0,
-      "beta3": 50.0,
-      "beta4": 10.0
+      "beta1": 94.4202,
+      "beta2": 64.9155,
+      "beta3": 1.0664,
+      "beta4": 2.8744,
+      "beta5": 47.6819
     }
   },
-  "NIQE": {
-    "type": "NR",
-    "strengths": ["Blurs", "Compression", "Noise"],
+
+  "CKDN": {
+    "type": "FR",
+    "strengths": ["Blurs", "Compression"],
     "logistic_params": {
-      "beta1": 1.0,
-      "beta2": 5.0,
-      "beta3": 5.0,
-      "beta4": 1.0
+      "beta1": 21.6375,
+      "beta2": 3.1301,
+      "beta3": 0.3708,
+      "beta4": -12.3232,
+      "beta5": 6.7834
     }
   },
-  "TOPIQ_NR": {
-    "type": "NR",
-    "strengths": ["Blurs", "Color distortions", "Compression", "Noise", "Sharpness", "Contrast"],
+
+  "VIF": {
+    "type": "FR",
+    "strengths": ["Blurs", "Noise"],
     "logistic_params": {
-      "beta1": 5.0,
-      "beta2": 1.0,
-      "beta3": 0.5,
-      "beta4": 0.1
+      "beta1": 0.4119,
+      "beta2": 49.7978,
+      "beta3": 0.2237,
+      "beta4": 2.4370,
+      "beta5": 1.3850
     }
   },
-  "MUSIQ": {
+
+  "QAlign": {
     "type": "NR",
-    "strengths": ["Blurs", "Color distortions", "Compression", "Noise", "Sharpness"],
+    "strengths": ["Blurs", "Color distortions", "Noise", "Brightness change", "Spatial distortions", "Sharpness"],
     "logistic_params": {
-      "beta1": 5.0,
-      "beta2": 1.0,
-      "beta3": 50.0,
-      "beta4": 10.0
+      "beta1": 28.8204,
+      "beta2": 0.1469,
+      "beta3": 6.1941,
+      "beta4": -0.1906,
+      "beta5": 6.7863
     }
   },
+
   "CLIPIQA": {
     "type": "NR",
     "strengths": ["Blurs", "Color distortions", "Noise", "Brightness change", "Sharpness", "Contrast"],
     "logistic_params": {
-      "beta1": 5.0,
-      "beta2": 1.0,
-      "beta3": 0.5,
-      "beta4": 0.1
+      "beta1": 21.7287,
+      "beta2": 0.1147,
+      "beta3": 0.4721,
+      "beta4": 3.5654,
+      "beta5": 1.0094
+    }
+  },
+
+  "UNIQUE": {
+    "type": "NR",
+    "strengths": ["Blurs", "Color distortions", "Noise"],
+    "logistic_params": {
+      "beta1": 52.5605,
+      "beta2": 0.2967,
+      "beta3": 0.8558,
+      "beta4": -2.9510,
+      "beta5": 5.6368
+    }
+  },
+
+  "HyperIQA": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression", "Noise"],
+    "logistic_params": {
+      "beta1": 0.4071,
+      "beta2": 39.0359,
+      "beta3": 0.3155,
+      "beta4": 3.1472,
+      "beta5": 0.9815
+    }
+  },
+
+  "TReS": {
+    "type": "NR",
+    "strengths": ["Blurs", "Noise"],
+    "logistic_params": {
+      "beta1": -0.0550,
+      "beta2": 6559.4161,
+      "beta3": 48.9070,
+      "beta4": 0.0255,
+      "beta5": 1.1176
+    }
+  },
+
+  "MUSIQ": {
+    "type": "NR",
+    "strengths": ["Blurs", "Color distortions", "Compression", "Noise", "Sharpness"],
+    "logistic_params": {
+      "beta1": 2.4078,
+      "beta2": -0.1123,
+      "beta3": 32.0686,
+      "beta4": 0.0734,
+      "beta5": -0.7363
+    }
+  },
+
+  "WaDIQaM_NR": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression"],
+    "logistic_params": {
+      "beta1": 106.9844,
+      "beta2": 1.2931,
+      "beta3": -0.3321,
+      "beta4": -31.9917,
+      "beta5": -8.0786
+    }
+  },
+
+  "DBCNN": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression", "Noise"],
+    "logistic_params": {
+      "beta1": 38.5349,
+      "beta2": 0.0851,
+      "beta3": 0.5159,
+      "beta4": 3.4921,
+      "beta5": 0.8607
+    }
+  },
+
+  "ARNIQA": {
+    "type": "NR",
+    "strengths": ["Blurs", "Color distortions"],
+    "logistic_params": {
+      "beta1": 2.2932,
+      "beta2": -13.4107,
+      "beta3": 0.2884,
+      "beta4": 7.5144,
+      "beta5": -0.6274
+    }
+  },
+
+  "NIMA": {
+    "type": "NR",
+    "strengths": ["Blurs", "Color distortions", "Compression"],
+    "logistic_params": {
+      "beta1": 1.0129,
+      "beta2": 5.3579,
+      "beta3": 4.6475,
+      "beta4": 0.3207,
+      "beta5": 1.0601
+    }
+  },
+
+  "BRISQUE": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression", "Noise"],
+    "logistic_params": {
+      "beta1": -2.2106,
+      "beta2": 0.0684,
+      "beta3": 54.3418,
+      "beta4": 0.0050,
+      "beta5": 2.2728
+    }
+  },
+
+  "NIQE": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression", "Noise"],
+    "logistic_params": {
+      "beta1": -1.4174,
+      "beta2": 0.8785,
+      "beta3": 6.9416,
+      "beta4": -0.0059,
+      "beta5": 2.7374
+    }
+  },
+
+  "MANIQA": {
+    "type": "NR",
+    "strengths": ["Blurs", "Compression", "Noise"],
+    "logistic_params": {
+      "beta1": 0.6818,
+      "beta2": 27.4817,
+      "beta3": 0.2621,
+      "beta4": 2.5196,
+      "beta5": 1.5758
+    }
+  },
+
+  "LIQE": {
+    "type": "NR",
+    "strengths": ["Blurs", "Color distortions", "Noise"],
+    "logistic_params": {
+      "beta1": 0.1494,
+      "beta2": 7.1114,
+      "beta3": 3.2801,
+      "beta4": 0.6936,
+      "beta5": 0.8655
     }
   }
 }

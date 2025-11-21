@@ -12,31 +12,40 @@ from src.agentic.tool_registry import ToolRegistry, ToolExecutionError
 
 @pytest.fixture
 def temp_tools_json():
-    """Create temporary tools.json file."""
+    """Create temporary tools.json file with 5-parameter logistic coefficients."""
     tools_data = {
         "QAlign": {
             "type": "NR",
             "strengths": ["Blurs", "Noise"],
             "logistic_params": {
-                "beta1": 5.0,
-                "beta2": 1.0,
-                "beta3": 3.0,
-                "beta4": 0.5
+                "beta1": 28.8204,
+                "beta2": 0.1469,
+                "beta3": 6.1941,
+                "beta4": -0.1906,
+                "beta5": 6.7863
             }
         },
         "TOPIQ_FR": {
             "type": "FR",
             "strengths": ["Blurs", "Compression"],
             "logistic_params": {
-                "beta1": 5.0,
-                "beta2": 1.0,
-                "beta3": 0.5,
-                "beta4": 0.1
+                "beta1": 21.73,
+                "beta2": 0.1147,
+                "beta3": 0.4721,
+                "beta4": 3.5654,
+                "beta5": 1.0094
             }
         },
         "BRISQUE": {
             "type": "NR",
-            "strengths": ["Blurs", "Compression", "Noise"]
+            "strengths": ["Blurs", "Compression", "Noise"],
+            "logistic_params": {
+                "beta1": -2.2106,
+                "beta2": 0.0684,
+                "beta3": 54.3418,
+                "beta4": 0.0050,
+                "beta5": 2.2728
+            }
         }
     }
 
@@ -153,21 +162,41 @@ class TestScoreNormalization:
         """Test normalization with extreme values."""
         registry = ToolRegistry(metadata_path=temp_tools_json)
 
-        # Very high score
+        # Very high score - should still be in valid range and clipped if needed
         normalized_high = registry.normalize_score("QAlign", 100.0)
-        assert normalized_high == 5.0
+        assert 1.0 <= normalized_high <= 5.0
+        assert np.isfinite(normalized_high)
 
-        # Very low score
+        # Very low score - should still be in valid range and clipped if needed
         normalized_low = registry.normalize_score("QAlign", -100.0)
-        assert normalized_low == 1.0
+        assert 1.0 <= normalized_low <= 5.0
+        assert np.isfinite(normalized_low)
 
-    def test_normalize_with_default_params(self, temp_tools_json):
-        """Test normalization with default parameters (missing logistic_params)."""
-        registry = ToolRegistry(metadata_path=temp_tools_json)
+    def test_normalize_requires_5_params(self, temp_tools_json):
+        """Test that normalization requires all 5 beta parameters."""
+        # Create tool with incomplete parameters
+        with open(temp_tools_json, 'r') as f:
+            tools_data = json.load(f)
 
-        # BRISQUE doesn't have logistic_params
-        normalized = registry.normalize_score("BRISQUE", 50.0)
-        assert 1.0 <= normalized <= 5.0
+        # Add tool with only 4 parameters
+        tools_data["IncompleteTool"] = {
+            "type": "NR",
+            "strengths": ["Blurs"],
+            "logistic_params": {
+                "beta1": 5.0,
+                "beta2": 1.0,
+                "beta3": 0.5,
+                "beta4": 0.1
+                # Missing beta5
+            }
+        }
+
+        with open(temp_tools_json, 'w') as f:
+            json.dump(tools_data, f)
+
+        # Should raise ValueError on load due to missing beta5
+        with pytest.raises(ValueError, match="missing logistic parameters.*beta5"):
+            ToolRegistry(metadata_path=temp_tools_json)
 
     def test_normalize_unknown_tool(self, temp_tools_json):
         """Test normalization with unknown tool raises error."""
@@ -180,10 +209,77 @@ class TestScoreNormalization:
         """Test that scores outside [1, 5] are clipped."""
         registry = ToolRegistry(metadata_path=temp_tools_json)
 
-        # Mock a scenario where logistic function returns out-of-range value
-        with patch('numpy.exp', return_value=0.0):
-            normalized = registry.normalize_score("QAlign", 5.0)
-            assert 1.0 <= normalized <= 5.0
+        # Test with various raw scores to ensure output is always clipped to [1, 5]
+        # The 5-parameter formula should ensure output is in range, with clipping as fallback
+        test_scores = [-1000, -100, -10, 0, 0.5, 1, 5, 10, 100, 1000]
+        for raw_score in test_scores:
+            normalized = registry.normalize_score("QAlign", raw_score)
+            assert 1.0 <= normalized <= 5.0, f"Score {normalized} out of range for raw_score={raw_score}"
+            assert np.isfinite(normalized)
+
+    def test_normalize_5param_formula(self, temp_tools_json):
+        """Test that 5-parameter formula is applied correctly."""
+        registry = ToolRegistry(metadata_path=temp_tools_json)
+
+        # Test with a known raw score
+        raw_score = 0.5
+        normalized = registry.normalize_score("TOPIQ_FR", raw_score)
+
+        # Manually compute expected value using 5-parameter formula
+        # q̂ = β₁(½ - 1/(exp(β₂(q̃ - β₃)))) + β₄q̃ + β₅
+        beta1, beta2, beta3, beta4, beta5 = 21.73, 0.1147, 0.4721, 3.5654, 1.0094
+        exponent = beta2 * (raw_score - beta3)
+        exp_term = np.exp(exponent)
+        expected = beta1 * (0.5 - 1.0 / exp_term) + beta4 * raw_score + beta5
+
+        # Clip to [1, 5]
+        expected = np.clip(expected, 1.0, 5.0)
+
+        # Should match within floating point tolerance
+        assert abs(normalized - expected) < 1e-6
+
+    def test_normalize_numerical_stability_large_exponent(self, temp_tools_json):
+        """Test numerical stability with very large positive exponent."""
+        registry = ToolRegistry(metadata_path=temp_tools_json)
+
+        # Create scenario with large positive exponent
+        # For TOPIQ_FR with very large raw_score
+        normalized = registry.normalize_score("TOPIQ_FR", 1000.0)
+
+        # Should handle gracefully and return valid score
+        assert 1.0 <= normalized <= 5.0
+        assert np.isfinite(normalized)
+
+    def test_normalize_numerical_stability_small_exponent(self, temp_tools_json):
+        """Test numerical stability with very large negative exponent."""
+        registry = ToolRegistry(metadata_path=temp_tools_json)
+
+        # Create scenario with large negative exponent
+        # For TOPIQ_FR with very small raw_score
+        normalized = registry.normalize_score("TOPIQ_FR", -1000.0)
+
+        # Should handle gracefully and return valid score
+        assert 1.0 <= normalized <= 5.0
+        assert np.isfinite(normalized)
+
+    def test_missing_logistic_params_raises_error(self, temp_tools_json):
+        """Test that missing logistic_params raises ValueError."""
+        # Create tool without logistic_params
+        with open(temp_tools_json, 'r') as f:
+            tools_data = json.load(f)
+
+        tools_data["NoParamsTool"] = {
+            "type": "NR",
+            "strengths": ["Blurs"]
+            # No logistic_params
+        }
+
+        with open(temp_tools_json, 'w') as f:
+            json.dump(tools_data, f)
+
+        # Should raise ValueError on load
+        with pytest.raises(ValueError, match="missing 'logistic_params'"):
+            ToolRegistry(metadata_path=temp_tools_json)
 
 
 class TestToolExecution:

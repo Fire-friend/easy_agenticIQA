@@ -241,10 +241,14 @@ class ScoreFusion:
         """
         Apply fusion formula to compute final quality score.
 
-        Formula from paper: q = Σ_{c∈{1,2,3,4,5}} α_c · p_c · c
+        Formula:
+            w_c = α_c · p_c
+            q = Σ(w_c · c) / Σ(w_c)
+
         where:
         - α_c: perceptual weights (sum to 1.0)
         - p_c: VLM probabilities (sum to 1.0)
+        - w_c: joint weights (normalized)
         - c: quality level
 
         Args:
@@ -266,22 +270,29 @@ class ScoreFusion:
         if not (0.99 <= alpha_sum <= 1.01):
             logger.error(f"Alpha weights sum to {alpha_sum:.3f}, should be 1.0")
 
-        # Apply fusion formula: q = Σ α_c · p_c · c
-        q = 0.0
+        # Compute joint weights: w_c = α_c · p_c
+        joint_weights = {}
         for c in self.quality_levels:
-            contribution = alpha[c] * vlm_probs.get(c, 0) * c
-            q += contribution
+            joint_weights[c] = alpha[c] * vlm_probs.get(c, 0)
 
-        # Clip to valid range [1.0, 5.0]
-        if q < 1.0 or q > 5.0:
-            logger.error(f"Fusion score {q:.3f} out of range [1.0, 5.0], clipping to {np.clip(q, 1.0, 5.0):.3f}")
-            q = np.clip(q, 1.0, 5.0)
+        # Normalize joint weights
+        weight_sum = sum(joint_weights.values())
+
+        if weight_sum < 1e-10:
+            # Fallback: if joint weights are too small, use tool mean
+            logger.warning("Joint weights sum to near zero, using tool score mean")
+            q = np.mean(tool_scores) if tool_scores else 3.0
+        else:
+            # Apply normalized fusion formula: q = Σ(w_c · c) / Σ(w_c)
+            numerator = sum(joint_weights[c] * c for c in self.quality_levels)
+            q = numerator / weight_sum
 
         # Logging
         tool_mean = np.mean(tool_scores) if tool_scores else 0.0
         logger.info(f"Score Fusion: q={q:.3f} (tool_mean={tool_mean:.3f})")
-        logger.info(f"  Alpha weights: {alpha}")
-        logger.info(f"  VLM probs: {vlm_probs}")
+        logger.debug(f"  Alpha weights: {alpha}")
+        logger.debug(f"  VLM probs: {vlm_probs}")
+        logger.debug(f"  Joint weights sum: {weight_sum:.6f}")
 
         return float(q)
 

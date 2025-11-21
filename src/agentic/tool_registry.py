@@ -1,6 +1,24 @@
 """
 Tool Registry for IQA-PyTorch integration.
 Manages IQA tool metadata, execution, and score normalization.
+
+Score Normalization:
+    Uses five-parameter monotonic logistic transformation (Sheikh et al., 2006):
+    q̂ = β₁(½ - 1/(exp(β₂(q̃ - β₃)))) + β₄q̃ + β₅
+
+    where:
+    - q̃: raw tool output
+    - q̂: normalized score in [1, 5] range
+    - β₁, β₂, β₃, β₄, β₅: fitted parameters from KADID-10k dataset
+
+Tool Metadata:
+    All tools must have 5-parameter logistic coefficients.
+    See iqa_tools/metadata/tools.json and docs/paper_fusion.md (Table 5).
+
+References:
+    - Sheikh et al. (2006): "A Statistical Evaluation of Recent Full Reference
+      Image Quality Assessment Algorithms"
+    - AgenticIQA paper Table 5 for fitted parameter values
 """
 
 import hashlib
@@ -71,6 +89,10 @@ class ToolRegistry:
 
             # Validate tool metadata
             for tool_name, metadata in self.tools.items():
+                # Skip comment fields (keys starting with _)
+                if tool_name.startswith('_'):
+                    continue
+
                 if 'type' not in metadata:
                     raise ValueError(f"Tool {tool_name} missing 'type' field")
                 if metadata['type'] not in ['FR', 'NR']:
@@ -78,8 +100,30 @@ class ToolRegistry:
                 if 'strengths' not in metadata:
                     logger.warning(f"Tool {tool_name} missing 'strengths' field")
                     metadata['strengths'] = []
+
+                # Validate 5-parameter logistic transformation parameters
                 if 'logistic_params' not in metadata:
-                    logger.warning(f"Tool {tool_name} missing logistic_params, will use defaults")
+                    raise ValueError(
+                        f"Tool {tool_name} missing 'logistic_params'. "
+                        f"All tools must have 5-parameter logistic coefficients (beta1-beta5) fitted on KADID-10k."
+                    )
+
+                params = metadata['logistic_params']
+                required_params = ['beta1', 'beta2', 'beta3', 'beta4', 'beta5']
+                missing = [p for p in required_params if p not in params]
+                if missing:
+                    raise ValueError(
+                        f"Tool {tool_name} missing logistic parameters: {missing}. "
+                        f"5-parameter transformation requires: beta1, beta2, beta3, beta4, beta5"
+                    )
+
+                # Validate parameter types
+                for param_name in required_params:
+                    param_value = params[param_name]
+                    if not isinstance(param_value, (int, float)):
+                        raise ValueError(
+                            f"Tool {tool_name} parameter '{param_name}' must be numeric, got {type(param_value)}"
+                        )
 
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in tool metadata file: {e}")
@@ -174,16 +218,23 @@ class ToolRegistry:
 
     def normalize_score(self, tool_name: str, raw_score: float) -> float:
         """
-        Normalize tool output to [1, 5] scale using logistic function.
+        Normalize tool output to [1, 5] scale using five-parameter monotonic logistic transformation.
 
-        Formula: f(x) = (β1 - β2) / (1 + exp(-(x - β3)/|β4|)) + β2
+        Formula (Sheikh et al., 2006):
+        q̂ = β₁(½ - 1/(exp(β₂(q̃ - β₃)))) + β₄q̃ + β₅
+
+        where q̃ is the raw score and q̂ is the normalized score.
+        Parameters (β₁, β₂, β₃, β₄, β₅) are fitted on KADID-10k dataset.
 
         Args:
             tool_name: Tool identifier
-            raw_score: Raw tool output
+            raw_score: Raw tool output (q̃)
 
         Returns:
-            Normalized score in [1, 5] range
+            Normalized score in [1, 5] range (q̂)
+
+        Raises:
+            ValueError: If tool not found or logistic parameters incomplete
         """
         if tool_name not in self.tools:
             raise ValueError(f"Unknown tool: {tool_name}")
@@ -191,33 +242,68 @@ class ToolRegistry:
         metadata = self.tools[tool_name]
         params = metadata.get('logistic_params')
 
-        # Use defaults if parameters not provided
+        # Require all 5 beta parameters (no defaults)
         if params is None:
-            # Default: higher raw score = better quality
-            params = {'beta1': 5.0, 'beta2': 1.0, 'beta3': 0.5, 'beta4': 0.1}
-            logger.warning(f"Using default logistic params for {tool_name}")
+            raise ValueError(
+                f"Tool {tool_name} missing 'logistic_params'. "
+                f"All tools must have 5-parameter logistic coefficients fitted on KADID-10k."
+            )
 
-        beta1 = params.get('beta1', 5.0)
-        beta2 = params.get('beta2', 1.0)
-        beta3 = params.get('beta3', 0.5)
-        beta4 = params.get('beta4', 0.1)
+        # Validate all 5 parameters are present
+        required_params = ['beta1', 'beta2', 'beta3', 'beta4', 'beta5']
+        missing_params = [p for p in required_params if p not in params]
+        if missing_params:
+            raise ValueError(
+                f"Tool {tool_name} missing logistic parameters: {missing_params}. "
+                f"5-parameter transformation requires: beta1, beta2, beta3, beta4, beta5"
+            )
 
-        # Apply logistic function
+        beta1 = params['beta1']
+        beta2 = params['beta2']
+        beta3 = params['beta3']
+        beta4 = params['beta4']
+        beta5 = params['beta5']
+
+        # Validate parameters are numeric
+        for i, beta in enumerate([beta1, beta2, beta3, beta4, beta5], 1):
+            if not isinstance(beta, (int, float)):
+                raise ValueError(f"Tool {tool_name} beta{i} must be numeric, got {type(beta)}")
+
+        # Apply 5-parameter monotonic logistic transformation
+        # Formula: q̂ = β₁(½ - 1/(exp(β₂(q̃ - β₃)))) + β₄q̃ + β₅
         try:
-            normalized = (beta1 - beta2) / (1 + np.exp(-(raw_score - beta3) / abs(beta4))) + beta2
-        except (OverflowError, FloatingPointError):
-            # Handle extreme values
-            if raw_score > beta3:
-                normalized = beta1
+            exponent = beta2 * (raw_score - beta3)
+
+            # Numerical stability: handle extreme exponents
+            if exponent > 100:
+                # exp(exponent) → ∞, so 1/exp(exponent) → 0
+                # Thus: β₁(½ - 0) + β₄q̃ + β₅ = β₁/2 + β₄q̃ + β₅
+                normalized = beta1 * 0.5 + beta4 * raw_score + beta5
+                logger.debug(f"Large exponent {exponent:.2f} for {tool_name}, using stable approximation")
+            elif exponent < -100:
+                # exp(exponent) → 0, so 1/exp(exponent) → ∞
+                # Thus: β₁(½ - ∞) + β₄q̃ + β₅ (dominated by linear term)
+                normalized = beta4 * raw_score + beta5
+                logger.debug(f"Small exponent {exponent:.2f} for {tool_name}, using stable approximation")
             else:
-                normalized = beta2
+                # Normal case: compute exp and apply formula
+                exp_term = np.exp(exponent)
+                normalized = beta1 * (0.5 - 1.0 / exp_term) + beta4 * raw_score + beta5
+
+        except (OverflowError, FloatingPointError) as e:
+            # Fallback for extreme numerical issues
+            logger.warning(f"Numerical error in normalization for {tool_name}: {e}, using linear approximation")
+            normalized = beta4 * raw_score + beta5
 
         # Clip to [1, 5] range
+        original_normalized = normalized
         normalized = float(np.clip(normalized, 1.0, 5.0))
 
-        if not (1.0 <= normalized <= 5.0):
-            logger.warning(f"Normalized score {normalized} outside [1, 5], clipping")
-            normalized = max(1.0, min(5.0, normalized))
+        if not (1.0 <= original_normalized <= 5.0):
+            logger.warning(
+                f"Normalized score {original_normalized:.4f} for {tool_name} outside [1, 5], "
+                f"clipped to {normalized:.4f} (raw_score={raw_score:.4f})"
+            )
 
         return normalized
 
