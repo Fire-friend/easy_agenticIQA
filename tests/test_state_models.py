@@ -28,12 +28,12 @@ class TestPlanControlFlags:
             distortion_detection=True,
             distortion_analysis=True,
             tool_selection=True,
-            tool_execution=True
+            tool_execute=True
         )
         assert flags.distortion_detection is True
         assert flags.distortion_analysis is True
         assert flags.tool_selection is True
-        assert flags.tool_execution is True
+        assert flags.tool_execute is True
 
     def test_serialization(self):
         """Test JSON serialization round-trip."""
@@ -41,7 +41,7 @@ class TestPlanControlFlags:
             distortion_detection=False,
             distortion_analysis=True,
             tool_selection=False,
-            tool_execution=False
+            tool_execute=False
         )
         json_str = flags.model_dump_json()
         parsed = PlanControlFlags.model_validate_json(json_str)
@@ -54,116 +54,116 @@ class TestPlannerOutput:
     def test_valid_output(self):
         """Test creating valid planner output."""
         output = PlannerOutput(
-            query_type="IQA",
-            query_scope=["vehicle"],
-            distortion_source="Explicit",
-            distortions={"vehicle": ["Blurs"]},
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=["vehicle"],
+            distortion_source="explicit",
+            required_distortions={"vehicle": ["Blurs"]},
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=True,
                 tool_selection=False,
-                tool_execution=False
+                tool_execute=False
             )
         )
-        assert output.query_type == "IQA"
-        assert output.query_scope == ["vehicle"]
-        assert output.distortion_source == "Explicit"
+        assert output.task_type == "IQA"
+        assert output.required_object_names == ["vehicle"]
+        assert output.distortion_source == "explicit"
 
     def test_global_scope(self):
         """Test planner output with global scope."""
         output = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Inferred",
-            distortions=None,
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="inferred",
+            required_distortions=None,
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
-        assert output.query_scope == "Global"
+        assert output.required_object_names is None
 
     def test_invalid_query_type(self):
-        """Test that invalid query_type raises ValidationError."""
+        """Test that invalid task_type raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
             PlannerOutput(
-                query_type="INVALID",
-                query_scope="Global",
-                distortion_source="Inferred",
-                distortions=None,
-                reference_mode="No-Reference",
-                required_tool=None,
+                task_type="INVALID",
+                required_object_names=None,
+                distortion_source="inferred",
+                required_distortions=None,
+                reference_type="No-Reference",
+                required_tools=None,
                 plan=PlanControlFlags(
                     distortion_detection=True,
                     distortion_analysis=True,
                     tool_selection=True,
-                    tool_execution=True
+                    tool_execute=True
                 )
             )
-        assert "query_type" in str(exc_info.value)
+        assert "task_type" in str(exc_info.value)
 
     def test_full_reference_mode(self):
         """Test planner output with Full-Reference mode."""
         output = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Explicit",
-            distortions={"Global": ["Noise", "Blur"]},
-            reference_mode="Full-Reference",
-            required_tool="LPIPS",
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="explicit",
+            required_distortions={"Global": ["Noise", "Blur"]},
+            reference_type="Full-Reference",
+            required_tools=["LPIPS"],
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=True,
                 tool_selection=False,
-                tool_execution=True
+                tool_execute=True
             )
         )
-        assert output.reference_mode == "Full-Reference"
-        assert output.required_tool == "LPIPS"
+        assert output.reference_type == "Full-Reference"
+        assert output.required_tools == ["LPIPS"]
 
     def test_json_parsing(self):
         """Test parsing from JSON string."""
         json_str = '''
         {
-            "query_type": "IQA",
-            "query_scope": ["vehicle"],
-            "distortion_source": "Explicit",
-            "distortions": {"vehicle": ["Blurs"]},
-            "reference_mode": "No-Reference",
-            "required_tool": null,
+            "task_type": "IQA",
+            "reference_type": "No-Reference",
+            "required_object_names": ["vehicle"],
+            "required_distortions": {"vehicle": ["Sharpness"]},
+            "required_tools": null,
+            "distortion_source": "explicit",
             "plan": {
                 "distortion_detection": false,
                 "distortion_analysis": true,
                 "tool_selection": false,
-                "tool_execution": false
+                "tool_execute": false
             }
         }
         '''
         output = PlannerOutput.model_validate_json(json_str)
-        assert output.query_type == "IQA"
-        assert output.query_scope == ["vehicle"]
+        assert output.task_type == "IQA"
+        assert output.required_object_names == ["vehicle"]
         assert output.plan.distortion_analysis is True
 
     def test_serialization_round_trip(self):
         """Test complete serialization round-trip."""
         original = PlannerOutput(
-            query_type="IQA",
-            query_scope=["car", "person"],
-            distortion_source="Inferred",
-            distortions={"car": ["Blur"], "person": ["Noise"]},
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=["car", "person"],
+            distortion_source="inferred",
+            required_distortions={"car": ["Blur"], "person": ["Noise"]},
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 
@@ -299,17 +299,17 @@ class TestAgenticIQAState:
     def test_state_with_plan(self):
         """Test state with plan included."""
         plan = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Inferred",
-            distortions=None,
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="inferred",
+            required_distortions=None,
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 
@@ -341,17 +341,17 @@ class TestStateMerging:
         }
 
         plan = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Inferred",
-            distortions=None,
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="inferred",
+            required_distortions=None,
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 

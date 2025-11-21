@@ -97,9 +97,13 @@ class ToolRegistry:
                     raise ValueError(f"Tool {tool_name} missing 'type' field")
                 if metadata['type'] not in ['FR', 'NR']:
                     raise ValueError(f"Tool {tool_name} has invalid type: {metadata['type']}")
-                if 'strengths' not in metadata:
-                    logger.warning(f"Tool {tool_name} missing 'strengths' field")
-                    metadata['strengths'] = []
+
+                # Validate description field (backward compatible)
+                if 'description' not in metadata:
+                    logger.warning(f"Tool {tool_name} missing 'description' field. Consider adding detailed description from paper Appendix A.3.")
+                    metadata['description'] = ""
+                elif not isinstance(metadata['description'], str):
+                    raise ValueError(f"Tool {tool_name} 'description' must be a string, got {type(metadata['description'])}")
 
                 # Validate 5-parameter logistic transformation parameters
                 if 'logistic_params' not in metadata:
@@ -182,6 +186,41 @@ class ToolRegistry:
             True if tool exists in metadata
         """
         return tool_name in self.tools
+
+    def get_tool_descriptions(self, reference_mode: Optional[str] = None) -> str:
+        """
+        Get formatted tool descriptions for VLM prompts.
+
+        Args:
+            reference_mode: Filter by "FR" or "NR" tool type, or None for all tools
+
+        Returns:
+            Formatted string with tool descriptions following paper Appendix A.3 format
+        """
+        descriptions = []
+
+        for tool_name, metadata in self.tools.items():
+            # Skip comment fields (keys starting with _)
+            if tool_name.startswith('_'):
+                continue
+
+            # Filter by reference mode if specified
+            if reference_mode is not None and metadata['type'] != reference_mode:
+                continue
+
+            # Get tool description (should already include "Best at evaluating" part)
+            description = metadata.get('description', '')
+            if not description:
+                # Fallback format if description is missing
+                logger.warning(f"Tool {tool_name} missing description")
+                description = f"{tool_name} ({metadata['type']}) - No description available."
+
+            # Format as bullet point
+            tool_entry = f"* **{tool_name}:** {description}"
+            descriptions.append(tool_entry)
+
+        # Join all descriptions with newlines
+        return "\n".join(descriptions)
 
     def _compute_image_hash(self, image_path: str) -> str:
         """Compute SHA256 hash of image file."""

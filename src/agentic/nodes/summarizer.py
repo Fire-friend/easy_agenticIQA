@@ -454,7 +454,7 @@ def summarizer_node(
         image_path = state["image_path"]
         reference_path = state.get("reference_path")
 
-        logger.info(f"Query type: {plan.query_type}")
+        logger.info(f"Task type: {plan.task_type}")
         logger.info(f"Query: {query}")
         logger.info(f"Image: {image_path}")
 
@@ -515,7 +515,7 @@ def summarizer_node(
         tool_mean = sum(all_scores) / len(all_scores) if all_scores else 3.0
 
         # Select prompt mode and format evidence
-        if plan.query_type == "IQA" and query_type_detected == QueryType.MCQ:
+        if plan.task_type == "IQA" and query_type_detected == QueryType.MCQ:
             # MCQ MODE: Categorical selection, final_answer is letter
             logger.info("Using MCQ mode (categorical selection)")
             distortion_text, tool_text = format_evidence_for_explanation(executor_output)
@@ -529,7 +529,7 @@ def summarizer_node(
             apply_fusion = False
             tool_scores_for_fusion = []
 
-        elif plan.query_type == "IQA" and query_type_detected == QueryType.SCORING:
+        elif plan.task_type == "IQA" and query_type_detected == QueryType.SCORING:
             # SCORING MODE: Request probability distributions and apply fusion
             # final_answer is numerical score
             logger.info("Using SCORING mode with fusion")
@@ -665,7 +665,7 @@ def summarizer_node(
 
                 need_replan, replan_reason = check_evidence_sufficiency(
                     executor_output=executor_output,
-                    query_scope=plan.query_scope,
+                    query_scope=plan.required_object_names,
                     max_iterations=max_replan_iterations,
                     current_iteration=iteration_count
                 )

@@ -24,7 +24,7 @@ class TestPromptConstruction:
         prompt = construct_planner_prompt("Is this image blurry?", has_reference=False)
         assert "User's query: Is this image blurry?" in prompt
         assert "System:" in prompt
-        assert "planner in an image quality assessment" in prompt
+        assert "Planner in an Image Quality Assessment" in prompt
 
     def test_prompt_with_reference(self):
         """Test constructing prompt with reference image."""
@@ -40,24 +40,24 @@ class TestOutputParsing:
         """Test parsing valid planner JSON."""
         json_str = '''
         {
-            "query_type": "IQA",
-            "query_scope": ["vehicle"],
-            "distortion_source": "Explicit",
-            "distortions": {"vehicle": ["Blurs"]},
-            "reference_mode": "No-Reference",
-            "required_tool": null,
+            "task_type": "IQA",
+            "reference_type": "No-Reference",
+            "required_object_names": ["vehicle"],
+            "required_distortions": {"vehicle": ["Sharpness"]},
+            "required_tools": null,
+            "distortion_source": "explicit",
             "plan": {
                 "distortion_detection": false,
                 "distortion_analysis": true,
                 "tool_selection": false,
-                "tool_execution": false
+                "tool_execute": false
             }
         }
         '''
         output = parse_planner_output(json_str)
         assert isinstance(output, PlannerOutput)
-        assert output.query_type == "IQA"
-        assert output.query_scope == ["vehicle"]
+        assert output.task_type == "IQA"
+        assert output.required_object_names == ["vehicle"]
 
     def test_parse_invalid_json(self):
         """Test that invalid JSON raises ValueError."""
@@ -67,10 +67,10 @@ class TestOutputParsing:
 
     def test_parse_invalid_schema(self):
         """Test that JSON not matching schema raises ValueError."""
-        json_str = '{"query_type": "INVALID", "query_scope": "Global"}'
+        json_str = '{"task_type": "INVALID", "required_object_names": null}'
         with pytest.raises(ValueError) as exc_info:
             parse_planner_output(json_str)
-        assert "Failed to validate" in str(exc_info.value)
+        assert "Failed to parse planner output" in str(exc_info.value)
 
 
 class TestPlannerNode:
@@ -98,17 +98,17 @@ class TestPlannerNode:
     def valid_plan_json(self):
         """Valid plan JSON response."""
         return json.dumps({
-            "query_type": "IQA",
-            "query_scope": "Global",
-            "distortion_source": "Inferred",
-            "distortions": None,
-            "reference_mode": "No-Reference",
-            "required_tool": None,
+            "task_type": "IQA",
+            "reference_type": "No-Reference",
+            "required_object_names": None,
+            "required_distortions": None,
+            "required_tools": None,
+            "distortion_source": "inferred",
             "plan": {
                 "distortion_detection": True,
                 "distortion_analysis": True,
                 "tool_selection": True,
-                "tool_execution": True
+                "tool_execute": True
             }
         })
 
@@ -135,7 +135,7 @@ class TestPlannerNode:
                 # Verify result
                 assert "plan" in result
                 assert isinstance(result["plan"], PlannerOutput)
-                assert result["plan"].query_type == "IQA"
+                assert result["plan"].task_type == "IQA"
 
     def test_planner_node_with_reference(self, temp_image, mock_config, valid_plan_json):
         """Test planner with reference image."""
@@ -154,7 +154,7 @@ class TestPlannerNode:
 
                 # Update JSON to reflect Full-Reference mode
                 plan_data = json.loads(valid_plan_json)
-                plan_data["reference_mode"] = "Full-Reference"
+                plan_data["reference_type"] = "Full-Reference"
                 mock_client.generate.return_value = json.dumps(plan_data)
 
                 mock_create.return_value = mock_client
@@ -162,7 +162,7 @@ class TestPlannerNode:
                 result = planner_node(state)
 
                 assert "plan" in result
-                assert result["plan"].reference_mode == "Full-Reference"
+                assert result["plan"].reference_type == "Full-Reference"
 
     def test_planner_node_image_not_found(self):
         """Test error handling for missing image."""
@@ -192,17 +192,17 @@ class TestPlannerNode:
                 mock_client.backend_name = "openai"
                 # First two attempts return invalid JSON, third succeeds
                 valid_json = json.dumps({
-                    "query_type": "IQA",
-                    "query_scope": "Global",
-                    "distortion_source": "Inferred",
-                    "distortions": None,
-                    "reference_mode": "No-Reference",
-                    "required_tool": None,
+                    "task_type": "IQA",
+                    "reference_type": "No-Reference",
+                    "required_object_names": None,
+                    "required_distortions": None,
+                    "required_tools": None,
+                    "distortion_source": "inferred",
                     "plan": {
                         "distortion_detection": True,
                         "distortion_analysis": True,
                         "tool_selection": True,
-                        "tool_execution": True
+                        "tool_execute": True
                     }
                 })
                 mock_client.generate.side_effect = [

@@ -27,7 +27,7 @@ class PlanControlFlags(BaseModel):
         ...,
         description="Whether to select appropriate IQA tools"
     )
-    tool_execution: bool = Field(
+    tool_execute: bool = Field(
         ...,
         description="Whether to execute selected IQA tools"
     )
@@ -39,7 +39,7 @@ class PlanControlFlags(BaseModel):
                     "distortion_detection": False,
                     "distortion_analysis": True,
                     "tool_selection": False,
-                    "tool_execution": False
+                    "tool_execute": False
                 }
             ]
         }
@@ -47,30 +47,30 @@ class PlanControlFlags(BaseModel):
 
 
 class PlannerOutput(BaseModel):
-    """Structured output from the Planner module."""
-    query_type: Literal["IQA", "Other"] = Field(
+    """Structured output from the Planner module (aligned with AgenticIQA paper Appendix A.2)."""
+    task_type: Literal["IQA", "Other"] = Field(
         ...,
-        description="Type of query: IQA (Image Quality Assessment) or Other"
+        description="Type of task: IQA (Image Quality Assessment) or Other"
     )
-    query_scope: Union[List[str], Literal["Global"]] = Field(
-        ...,
-        description="Scope of the query: list of specific objects or 'Global'"
-    )
-    distortion_source: Literal["Explicit", "Inferred"] = Field(
-        ...,
-        description="Whether distortions are explicitly mentioned or need to be inferred"
-    )
-    distortions: Optional[Dict[str, List[str]]] = Field(
-        None,
-        description="Map of objects/Global to their distortion types"
-    )
-    reference_mode: Literal["Full-Reference", "No-Reference"] = Field(
+    reference_type: Literal["Full-Reference", "No-Reference"] = Field(
         ...,
         description="Whether a reference image is provided"
     )
-    required_tool: Optional[str] = Field(
+    required_object_names: Optional[List[str]] = Field(
         None,
-        description="Specific tool required if user explicitly requested one"
+        description="List of specific objects/regions mentioned in query, or null for global queries"
+    )
+    required_distortions: Optional[Dict[str, List[str]]] = Field(
+        None,
+        description="Map of objects/Global to their distortion types (if explicitly mentioned)"
+    )
+    required_tools: Optional[List[str]] = Field(
+        None,
+        description="List of specific tools explicitly requested by user, or null if none mentioned"
+    )
+    distortion_source: Literal["explicit", "inferred"] = Field(
+        ...,
+        description="Whether distortions are explicitly mentioned or need to be inferred"
     )
     plan: PlanControlFlags = Field(
         ...,
@@ -81,17 +81,17 @@ class PlannerOutput(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "query_type": "IQA",
-                    "query_scope": ["vehicle"],
-                    "distortion_source": "Explicit",
-                    "distortions": {"vehicle": ["Blurs"]},
-                    "reference_mode": "No-Reference",
-                    "required_tool": None,
+                    "task_type": "IQA",
+                    "reference_type": "No-Reference",
+                    "required_object_names": ["vehicle"],
+                    "required_distortions": {"vehicle": ["Sharpness"]},
+                    "required_tools": None,
+                    "distortion_source": "explicit",
                     "plan": {
                         "distortion_detection": False,
                         "distortion_analysis": True,
                         "tool_selection": False,
-                        "tool_execution": False
+                        "tool_execute": False
                     }
                 }
             ]

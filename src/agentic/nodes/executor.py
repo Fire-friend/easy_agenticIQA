@@ -230,20 +230,14 @@ def tool_selection_subtask(
     Returns:
         Selected tools dict or None if selection fails
     """
-    # Format tool descriptions for VLM
-    tool_descriptions = {}
-    for tool_name, metadata in tool_registry.tools.items():
-        # Skip comment fields (keys starting with _)
-        if tool_name.startswith('_'):
-            continue
-        tool_descriptions[tool_name] = {
-            "type": metadata['type'],
-            "strengths": metadata.get('strengths', [])
-        }
+    # Get formatted tool descriptions from registry
+    # Filter by reference mode to only show relevant tools
+    reference_mode = "FR" if reference_available else "NR"
+    tool_description = tool_registry.get_tool_descriptions(reference_mode=reference_mode)
 
     prompt = TOOL_SELECTION_PROMPT_TEMPLATE.format(
         distortion_set=json.dumps(distortion_set),
-        tool_description=json.dumps(tool_descriptions, indent=2)
+        tool_description=tool_description
     )
 
     # Add FR/NR guidance
@@ -471,12 +465,12 @@ def executor_node(
         executor_output.distortion_set = distortion_set
     else:
         # Use distortions from Planner if available
-        executor_output.distortion_set = plan.distortions
+        executor_output.distortion_set = plan.required_distortions
 
     # 2. Distortion Analysis
     if control_flags.distortion_analysis:
         logger.info("Running distortion analysis subtask")
-        distortion_set_for_analysis = executor_output.distortion_set or plan.distortions
+        distortion_set_for_analysis = executor_output.distortion_set or plan.required_distortions
 
         if distortion_set_for_analysis:
             distortion_analysis = distortion_analysis_subtask(
@@ -487,15 +481,18 @@ def executor_node(
     # 3. Tool Selection
     if control_flags.tool_selection and tool_registry is not None:
         logger.info("Running tool selection subtask")
-        distortion_set_for_selection = executor_output.distortion_set or plan.distortions
+        distortion_set_for_selection = executor_output.distortion_set or plan.required_distortions
 
         if distortion_set_for_selection:
-            # Check if Planner specified required_tool
-            if plan.required_tool:
-                logger.info(f"Using required tool: {plan.required_tool}")
+            # Check if Planner specified required_tools
+            if plan.required_tools:
+                logger.info(f"Using required tools: {plan.required_tools}")
                 selected_tools = {}
+                # Use first tool from required_tools array for all distortions
+                # (in practice, usually only one tool is specified)
+                default_tool = plan.required_tools[0]
                 for obj, distortions in distortion_set_for_selection.items():
-                    selected_tools[obj] = {dist: plan.required_tool for dist in distortions}
+                    selected_tools[obj] = {dist: default_tool for dist in distortions}
                 executor_output.selected_tools = selected_tools
             else:
                 selected_tools = tool_selection_subtask(
@@ -510,7 +507,7 @@ def executor_node(
                 executor_output.selected_tools = selected_tools
 
     # 4. Tool Execution
-    if control_flags.tool_execution and tool_registry is not None:
+    if control_flags.tool_execute and tool_registry is not None:
         logger.info("Running tool execution subtask")
 
         if executor_output.selected_tools:

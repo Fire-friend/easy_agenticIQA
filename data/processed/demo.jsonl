@@ -1,2 +1,3 @@
 {"query": "What is the major distortion of this image?", "image_path": "/data/wujiawei/CVPR/data/all_in_one/LOL/test/low/23.png", "reference_path": null, "ground_truth": null}
 {"query": "Rate the perceptual quality of this image.", "image_path": "/data/wujiawei/CVPR/data/all_in_one/real_rain/real_rain/Practical/GT_p2.jpg", "reference_path": null, "ground_truth": null}
+{"query": "Is the singing man in the image emphasized in the image?", "image_path": "/data/wujiawei/CVPR/data/all_in_one/real_rain/real_rain/Practical/GT_p2.jpg", "reference_path": null, "ground_truth": null}

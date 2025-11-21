@@ -33,17 +33,17 @@ def temp_image():
 def valid_plan():
     """Create valid Planner output."""
     return PlannerOutput(
-        query_type="IQA",
-        query_scope=["vehicle"],
-        distortion_source="Explicit",
-        distortions={"vehicle": ["Blurs"]},
-        reference_mode="No-Reference",
-        required_tool=None,
+        task_type="IQA",
+        required_object_names=["vehicle"],
+        distortion_source="explicit",
+        required_distortions={"vehicle": ["Blurs"]},
+        reference_type="No-Reference",
+        required_tools=None,
         plan=PlanControlFlags(
             distortion_detection=False,
             distortion_analysis=True,
             tool_selection=True,
-            tool_execution=True
+            tool_execute=True
         )
     )
 
@@ -141,7 +141,7 @@ class TestPlannerToExecutorFlow:
         # Verify state contains both plan and executor_evidence
         assert "plan" in final_state
         assert "executor_evidence" in final_state
-        assert final_state["plan"].query_type == "IQA"
+        assert final_state["plan"].task_type == "IQA"
         assert final_state["executor_evidence"] is not None
 
     def test_executor_handles_missing_plan(self, temp_image):
@@ -176,17 +176,17 @@ class TestPlannerToExecutorFlow:
 
         # Disable all flags
         plan_no_tasks = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Explicit",
-            distortions={"Global": ["Noise"]},
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="explicit",
+            required_distortions={"Global": ["Noise"]},
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=False,
                 tool_selection=False,
-                tool_execution=False
+                tool_execute=False
             )
         )
 
@@ -234,17 +234,17 @@ class TestPlannerToExecutorFlow:
 
         # Create plan with preselected tools
         plan_with_tools = PlannerOutput(
-            query_type="IQA",
-            query_scope=["vehicle"],
-            distortion_source="Explicit",
-            distortions={"vehicle": ["Blurs"]},
-            reference_mode="No-Reference",
-            required_tool="QAlign",
+            task_type="IQA",
+            required_object_names=["vehicle"],
+            distortion_source="explicit",
+            required_distortions={"vehicle": ["Blurs"]},
+            reference_type="No-Reference",
+            required_tools=["QAlign"],
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=False,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 
@@ -299,17 +299,17 @@ class TestExecutorErrorHandling:
         mock_config.return_value = mock_backend
 
         plan = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Explicit",
-            distortions={"Global": ["Noise"]},
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="explicit",
+            required_distortions={"Global": ["Noise"]},
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=False,
                 tool_selection=False,
-                tool_execution=False
+                tool_execute=False
             )
         )
 
@@ -338,17 +338,17 @@ class TestExecutorErrorHandling:
         mock_config.return_value = mock_backend
 
         plan = PlannerOutput(
-            query_type="IQA",
-            query_scope="Global",
-            distortion_source="Explicit",
-            distortions={"Global": ["Noise"]},
-            reference_mode="No-Reference",
-            required_tool=None,
+            task_type="IQA",
+            required_object_names=None,
+            distortion_source="explicit",
+            required_distortions={"Global": ["Noise"]},
+            reference_type="No-Reference",
+            required_tools=None,
             plan=PlanControlFlags(
                 distortion_detection=False,
                 distortion_analysis=True,
                 tool_selection=False,
-                tool_execution=False
+                tool_execute=False
             )
         )
 

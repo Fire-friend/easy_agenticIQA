@@ -18,41 +18,80 @@ from src.utils.config import load_model_backends
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Planner prompt template from docs/02_module_planner.md (Paper Appendix A.2)
+# Planner prompt template from AgenticIQA paper Appendix A.2 (exact format)
 PLANNER_PROMPT_TEMPLATE = """System:
-You are a planner in an image quality assessment (IQA) system. Your task is to analyze the user's query and
-generate a structured plan for downstream assessment.
-Return a valid JSON object in the following format:
+You are a Planner in an Image Quality Assessment (IQA) agent system. Your task is to analyze the user's query and generate a structured plan for downstream assessment. Please follow the instructions below.
+Return a valid JSON list in the following format:
+
 {{
-  "query_type": "IQA" or "Other",
-  "query_scope": ["<object1>", "<object2>", ...] or "Global",
-  "distortion_source": "Explicit" or "Inferred",
-  "distortions": {{"<object_or_Global>": ["<distortion1>", "<distortion2>"]}} or null,
-  "reference_mode": "Full-Reference" or "No-Reference",
-  "required_tool": null,
+  "task_type": "IQA" or "Other",
+  "reference_type": "Full-Reference" or "No-Reference",
+  "required_object_names": ["<object1>", ...] or null,
+  "required_distortions": {{"<object_name>" or "Global": ["<distortion1>", ...]}}}} or null,
+  "required_tools": ["<tool_name1>", ...] or null,
+  "distortion_source": "explicit" or "inferred",
   "plan": {{
     "distortion_detection": true or false,
-    "distortion_analysis": true or false,
     "tool_selection": true or false,
-    "tool_execution": true or false
+    "distortion_analysis": true or false,
+    "tool_execute": true or false
   }}
 }}
 
-FIELD SPECIFICATIONS:
-- "distortions": If user explicitly mentions distortions, use format {{"Global": ["Blurs", "Noise"]}} or {{"vehicle": ["Blurs"]}}.
-  Valid distortion types: "Blurs", "Color distortions", "Compression", "Noise", "Brightness change", "Sharpness", "Contrast", "Spatial distortions"
-  If distortions need to be inferred, set to null and set "distortion_detection" to true.
+---
 
-IMPORTANT RULES:
-1. "required_tool" should ALWAYS be set to null. Tool selection will be handled by a specialized downstream module.
-2. Set "tool_selection" to true in the plan to enable automatic tool selection.
-3. Do NOT invent tool names or use generic names like "No-Reference IQA Tool" or "BlurDetectionTool".
-4. For "distortions" field: MUST be either null or a dict with object names as keys and lists of distortion types as values.
+## Instructions
 
-EXAMPLES:
-- Query about blur: {{"distortions": {{"Global": ["Blurs"]}}}}
-- Query about quality (no specific distortion): {{"distortions": null}}
-- Multiple distortions: {{"distortions": {{"Global": ["Blurs", "Noise", "Compression"]}}}}
+### 1. Task Type
+
+* If the query concerns image quality assessment, set `"task_type"` to `"IQA"`.
+* Otherwise, set it to `"Other"`.
+
+### 2. Reference Type
+
+* If both distorted and reference images are mentioned, set `"reference_type"` to `"Full-Reference"`.
+* Otherwise, set it to `"No-Reference"`.
+
+### 3. Required Object Names
+
+* Extract object/region names (e.g., "the building", "purple flowers") from the query.
+* If none are found, set to `null`.
+
+### 4. Required Distortions
+
+* If distortions are tied to regions, use those region names as dictionary keys.
+* If distortions apply to the whole image, use `"Global"` as the key.
+* If no distortions are referenced, set to `null`.
+
+#### Map descriptive terms to standard categories:
+
+* "saturation", "colorful", "vivid" → **Colorfulness**
+* "sharp", "blurry", "compression", "JPEG" → **Sharpness**
+* "dark", "bright", "lighting", "exposure" → **Brightness**
+* "contrast" → **Contrast**
+* "noise", "noisy" → **Noise**
+
+### 5. Required Tools
+
+* Include only if specific tool names are explicitly mentioned in the query (e.g., "use LPIPS").
+* Do **not** infer or recommend tools; if none mentioned, set to `null`.
+
+### 6. Distortion Source
+
+* If distortion-related terms are mentioned, set to `"explicit"`.
+* Otherwise, use `"inferred"`.
+
+### 7. Plan
+
+* If `"task_type"` is `"Other"`, set all flags to **false**.
+* If distortions are mentioned, set `"distortion_detection"` to **false**; else **true**.
+* Always set `"distortion_analysis"` to **true**.
+* If both region and tool are mentioned: `"tool_selection" = false`, `"tool_execute" = true`.
+* If only region is mentioned: `"tool_selection" = false`, `"tool_execute" = false`.
+* If only tool is mentioned: `"tool_selection" = false`, `"tool_execute" = true`.
+* If neither is mentioned: `"tool_selection" = true`, `"tool_execute" = true`.
+
+---
 
 User:
 User's query: {query}
@@ -207,7 +246,7 @@ def planner_node(
             # Parse and validate output
             plan = parse_planner_output(response)
 
-            logger.info(f"Planner succeeded: query_type={plan.query_type}, scope={plan.query_scope}")
+            logger.info(f"Planner succeeded: task_type={plan.task_type}, required_objects={plan.required_object_names}")
 
             # Check if this is a replanning iteration
             # If "plan" already exists in state, this is a replan - increment iteration
