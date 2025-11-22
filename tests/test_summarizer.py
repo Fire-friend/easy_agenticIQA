@@ -8,12 +8,10 @@ from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 
 from src.agentic.nodes.summarizer import (
-    format_evidence_for_explanation,
-    format_evidence_for_scoring,
+    format_evidence_unified,
     check_evidence_sufficiency,
     summarizer_node,
-    EXPLANATION_PROMPT_TEMPLATE,
-    SCORING_PROMPT_TEMPLATE
+    PAPER_UNIFIED_PROMPT_TEMPLATE
 )
 from src.agentic.state import (
     AgenticIQAState,
@@ -26,54 +24,63 @@ from src.agentic.state import (
 
 
 class TestPromptTemplates:
-    """Tests for prompt templates."""
+    """Tests for unified prompt template (paper specification)."""
 
-    def test_explanation_template_has_required_placeholders(self):
-        """Test that explanation template has required placeholders."""
-        assert "{query}" in EXPLANATION_PROMPT_TEMPLATE
-        assert "{distortion_analysis}" in EXPLANATION_PROMPT_TEMPLATE
-        assert "{tool_responses}" in EXPLANATION_PROMPT_TEMPLATE
-        assert "<image>" in EXPLANATION_PROMPT_TEMPLATE
+    def test_unified_template_has_required_placeholders(self):
+        """Test that unified template has required placeholders from paper."""
+        assert "{query}" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "{distortion_analysis}" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "{tool_scores}" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "{reference_type}" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "{prior_answer}" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "<image>" in PAPER_UNIFIED_PROMPT_TEMPLATE
 
-    def test_scoring_template_has_required_placeholders(self):
-        """Test that scoring template has required placeholders."""
-        assert "{query}" in SCORING_PROMPT_TEMPLATE
-        assert "{distortion_analysis}" in SCORING_PROMPT_TEMPLATE
-        assert "{tool_scores}" in SCORING_PROMPT_TEMPLATE
-        assert "<image>" in SCORING_PROMPT_TEMPLATE
+    def test_unified_template_has_paper_elements(self):
+        """Test that unified template matches paper specification."""
+        # Check for paper's system message elements
+        assert "summarizer assistant" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "Image Quality Assessment" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "quality_reasoning" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "final_answer" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        # Check guidelines section
+        assert "Guidelines" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "key distortions" in PAPER_UNIFIED_PROMPT_TEMPLATE
+        assert "Reference tool scores" in PAPER_UNIFIED_PROMPT_TEMPLATE
 
-    def test_explanation_template_format(self):
-        """Test that explanation template can be formatted."""
-        prompt = EXPLANATION_PROMPT_TEMPLATE.format(
+    def test_unified_template_format(self):
+        """Test that unified template can be formatted with all parameters."""
+        prompt = PAPER_UNIFIED_PROMPT_TEMPLATE.format(
             query="Is this image blurry?",
             distortion_analysis='{"vehicle": [{"type": "Blurs", "severity": "moderate"}]}',
-            tool_responses='{"vehicle": {"Blurs": {"tool": "QAlign", "score": 2.8}}}'
+            tool_scores='{"vehicle": {"Blurs": {"tool": "QAlign", "score": 2.8}}}',
+            reference_type="No-Reference",
+            prior_answer="This is the first iteration"
         )
         assert "Is this image blurry?" in prompt
         assert "QAlign" in prompt
-
-    def test_scoring_template_format(self):
-        """Test that scoring template can be formatted."""
-        prompt = SCORING_PROMPT_TEMPLATE.format(
-            query="What is the quality?",
-            distortion_analysis='{"Global": [{"type": "Noise", "severity": "slight"}]}',
-            tool_scores='{"Global": {"Noise": {"tool": "BRISQUE", "score": 3.5}}}'
-        )
-        assert "What is the quality?" in prompt
-        assert "BRISQUE" in prompt
+        assert "No-Reference" in prompt
+        assert "first iteration" in prompt
 
 
 class TestEvidenceFormatting:
-    """Tests for evidence formatting functions."""
+    """Tests for unified evidence formatting function."""
 
-    def test_format_evidence_for_explanation_no_evidence(self):
-        """Test formatting with no evidence."""
-        distortion_text, tool_text = format_evidence_for_explanation(None)
+    def test_format_evidence_unified_no_evidence(self):
+        """Test formatting with no evidence (first iteration, NR mode)."""
+        evidence = format_evidence_unified(
+            executor_output=None,
+            reference_path=None,
+            iteration_count=0,
+            replan_history=[],
+            previous_result=None
+        )
 
-        assert distortion_text == "No evidence available"
-        assert tool_text == "No tool responses available"
+        assert evidence["distortion_analysis"] == "No distortion analysis available"
+        assert evidence["tool_scores"] == "No tool scores available"
+        assert evidence["reference_type"] == "No-Reference"
+        assert "first iteration" in evidence["prior_answer"]
 
-    def test_format_evidence_for_explanation_with_data(self):
+    def test_format_evidence_unified_with_data(self):
         """Test formatting with complete evidence."""
         executor_output = ExecutorOutput(
             distortion_analysis={
@@ -92,11 +99,17 @@ class TestEvidenceFormatting:
             }
         )
 
-        distortion_text, tool_text = format_evidence_for_explanation(executor_output)
+        evidence = format_evidence_unified(
+            executor_output=executor_output,
+            reference_path=None,
+            iteration_count=0,
+            replan_history=[],
+            previous_result=None
+        )
 
         # Should be valid JSON
-        distortion_data = json.loads(distortion_text)
-        tool_data = json.loads(tool_text)
+        distortion_data = json.loads(evidence["distortion_analysis"])
+        tool_data = json.loads(evidence["tool_scores"])
 
         assert "vehicle" in distortion_data
         assert distortion_data["vehicle"][0]["type"] == "Blurs"
@@ -106,22 +119,11 @@ class TestEvidenceFormatting:
         assert tool_data["vehicle"]["Blurs"]["tool"] == "QAlign"
         assert tool_data["vehicle"]["Blurs"]["score"] == 2.8
 
-    def test_format_evidence_for_explanation_missing_distortion(self):
-        """Test formatting with no distortion analysis."""
-        executor_output = ExecutorOutput(
-            distortion_analysis=None,
-            quality_scores={
-                "Global": {"Overall": ("TOPIQ", 4.2)}
-            }
-        )
+        assert evidence["reference_type"] == "No-Reference"
+        assert "first iteration" in evidence["prior_answer"]
 
-        distortion_text, tool_text = format_evidence_for_explanation(executor_output)
-
-        assert distortion_text == "No distortion analysis available"
-        assert "TOPIQ" in tool_text
-
-    def test_format_evidence_for_scoring_with_data(self):
-        """Test scoring mode formatting."""
+    def test_format_evidence_unified_full_reference(self):
+        """Test formatting with full-reference mode."""
         executor_output = ExecutorOutput(
             distortion_analysis={
                 "Global": [
@@ -133,21 +135,59 @@ class TestEvidenceFormatting:
                 ]
             },
             quality_scores={
-                "Global": {
-                    "Noise": ("BRISQUE", 3.5)
-                }
+                "Global": {"Noise": ("LPIPS", 3.5)}
             }
         )
 
-        distortion_text, tool_text = format_evidence_for_scoring(executor_output)
+        evidence = format_evidence_unified(
+            executor_output=executor_output,
+            reference_path="/path/to/reference.jpg",
+            iteration_count=0,
+            replan_history=[],
+            previous_result=None
+        )
 
-        # Should be valid JSON
-        distortion_data = json.loads(distortion_text)
-        tool_data = json.loads(tool_text)
+        assert evidence["reference_type"] == "Full-Reference"
+        assert "LPIPS" in evidence["tool_scores"]
 
-        assert "Global" in distortion_data
-        assert "Global" in tool_data
-        assert tool_data["Global"]["Noise"]["score"] == 3.5
+    def test_format_evidence_unified_with_prior_answer(self):
+        """Test formatting with prior answer from replanning iteration."""
+        executor_output = ExecutorOutput(
+            distortion_analysis={
+                "Global": [
+                    DistortionAnalysis(
+                        type="Noise",
+                        severity="slight",
+                        explanation="Minor noise visible."
+                    )
+                ]
+            },
+            quality_scores={
+                "Global": {"Noise": ("BRISQUE", 3.5)}
+            }
+        )
+
+        previous_result = SummarizerOutput(
+            final_answer="C",
+            quality_score=3.0,
+            quality_reasoning="Moderate quality detected",
+            need_replan=True,
+            replan_reason="Missing analysis for person"
+        )
+
+        evidence = format_evidence_unified(
+            executor_output=executor_output,
+            reference_path=None,
+            iteration_count=1,
+            replan_history=["[Iteration 0] Missing analysis for person"],
+            previous_result=previous_result
+        )
+
+        # Should contain prior answer information
+        assert "Previous answer" in evidence["prior_answer"]
+        assert "C" in evidence["prior_answer"]
+        assert "Moderate quality" in evidence["prior_answer"]
+        assert "Missing analysis for person" in evidence["prior_answer"]
 
 
 class TestEvidenceSufficiency:
@@ -310,7 +350,7 @@ class TestSummarizerNode:
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 
@@ -429,7 +469,7 @@ class TestSummarizerNode:
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 
@@ -468,7 +508,7 @@ class TestSummarizerNode:
                 distortion_detection=True,
                 distortion_analysis=True,
                 tool_selection=True,
-                tool_execution=True
+                tool_execute=True
             )
         )
 

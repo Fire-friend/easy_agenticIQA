@@ -144,94 +144,46 @@ def detect_query_type(query: str, vlm_client=None) -> QueryType:
 
 # ==================== Prompt Templates ====================
 
-# Exact prompt from docs/04_module_summarizer.md for explanation/QA mode
-EXPLANATION_PROMPT_TEMPLATE = """System:
-You are a visual quality assessment assistant. Your task is to select the most appropriate answer to the user's
-question. You are given:
-- Distortion analysis (severity and visual impact of listed distortions)
-- Tool response (overall quality scores from IQA models)
-- Image content
-Decision process
-1. First, understand what kind of visual information is needed to answer the user's question.
-2. Check if the provided distortion analysis or tool response already contains the required information.
-3. If the provided information is sufficient, use it to answer.
-4. If the information is unclear or insufficient, analyze the image directly to determine the best answer.
-Return a valid JSON object in the following format:
+# Paper's unified prompt template for all query types
+# Source: Original AgenticIQA paper - Summarizer system message
+PAPER_UNIFIED_PROMPT_TEMPLATE = """You are a **summarizer assistant** in an Image Quality Assessment (IQA) agent system. Your task is to integrate information from prior distortion analysis and computed IQA tool scores to produce a comprehensive quality interpretation and directly answer the user query.
+
+**User Query:** {query}
+
+**Your Input Includes:**
+
+1. **Distortion Analysis:** Severity, category, and explanation of detected distortions per region or globally.
+2. **IQA Tool Scores:** Quality scores (range 1 to 5) assigned by specific IQA tools based on the distortions.
+3. **Reference Type:** {reference_type}
+4. **Optional Prior Answer:** {prior_answer}
+5. **Optional Image Input:** You may also infer the answer from images and query directly.
+
+**Return a valid JSON object in the following format:**
+
+```json
 {{
-  "final_answer": "<one of the above letters>",
-  "quality_reasoning": "<brief explanation, based on either distortion analysis, tool response, or direct visual observation>"
+  "quality_reasoning": "<Summary of the reasoning process, combining distortions, severity, descriptions, and IQA scores>",
+  "final_answer": "<Concise and direct response to the user query based on the full reasoning>"
 }}
+```
 
-User:
-User's query: {query}
+**Guidelines:**
 
-Distortion analysis:
+* In `"quality_reasoning"`:
+  * Summarize the key distortions and their visual impact.
+  * Reference tool scores to support your conclusion.
+  * Ensure the logic connecting observations and conclusions are clear and interpretable.
+
+* In `"final_answer"`:
+  * Provide a direct and concise judgment regarding the user query.
+  * Use natural and human-readable phrasing.
+
+* Only return the JSON object. Do not include any markdown, commentary, or additional text.
+
+**Distortion Analysis:**
 {distortion_analysis}
 
-Tool responses:
-{tool_responses}
-
-The image: <image>"""
-
-# Updated prompt for scoring mode - requests probability distributions
-SCORING_WITH_FUSION_PROMPT_TEMPLATE = """System:
-You are a visual quality assessment assistant. Given the question and the analysis (tool scores, distortion analysis), assess the image quality and provide your confidence for each quality level.
-
-Tool scores (1-5 scale, higher is better): {tool_scores}
-Tool score mean: {tool_mean:.2f}
-
-Distortion analysis:
-{distortion_analysis}
-
-Your task:
-1. Analyze the image quality based on the evidence
-2. For EACH quality level, provide your log-probability (confidence):
-   - Level 5 (Excellent): no visible distortions
-   - Level 4 (Good): minor distortions, minimal impact
-   - Level 3 (Fair): moderate distortions, noticeable impact
-   - Level 2 (Poor): severe distortions, significant impact
-   - Level 1 (Bad): extreme distortions, unusable quality
-
-Return valid JSON:
-{{
-  "quality_probs": {{
-    "1": <log_prob_1>,
-    "2": <log_prob_2>,
-    "3": <log_prob_3>,
-    "4": <log_prob_4>,
-    "5": <log_prob_5>
-  }},
-  "quality_reasoning": "<concise justification referencing distortions and tool scores>"
-}}
-
-User:
-User's query: {query}
-
-The image: <image>"""
-
-# Legacy scoring prompt (for backward compatibility with MCQ queries)
-SCORING_PROMPT_TEMPLATE = """System:
-You are a visual quality assessment assistant. Given the question and the analysis (tool scores, distortion
-analysis). Your task is to assess the image quality.
-You must select one single answer from the following:
-A. Excellent
-B. Good
-C. Fair
-D. Poor
-E. Bad
-Return the JSON:
-{{
-  "final_answer": "<one letter>",
-  "quality_reasoning": "<concise justification referencing distortions or tool scores>"
-}}
-
-User:
-User's query: {query}
-
-Distortion analysis:
-{distortion_analysis}
-
-Tool scores:
+**IQA Tool Scores:**
 {tool_scores}
 
 The image: <image>"""
@@ -239,21 +191,34 @@ The image: <image>"""
 
 # ==================== Evidence Formatting ====================
 
-def format_evidence_for_explanation(executor_output: Optional[ExecutorOutput]) -> Tuple[str, str]:
+def format_evidence_unified(
+    executor_output: Optional[ExecutorOutput],
+    reference_path: Optional[str],
+    iteration_count: int,
+    replan_history: List[str],
+    previous_result: Optional[SummarizerOutput] = None
+) -> Dict[str, str]:
     """
-    Format Executor evidence for explanation/QA mode prompt.
+    Format Executor evidence for the unified prompt template.
+
+    Generates all evidence fields required by PAPER_UNIFIED_PROMPT_TEMPLATE:
+    - distortion_analysis: JSON formatted distortion analysis
+    - tool_scores: JSON formatted tool scores (1-5 range)
+    - reference_type: "Full-Reference" or "No-Reference"
+    - prior_answer: Previous iteration's answer or "None"
 
     Args:
-        executor_output: Executor evidence
+        executor_output: Executor evidence containing distortion_analysis and quality_scores
+        reference_path: Path to reference image (if FR mode)
+        iteration_count: Current iteration count (0-indexed)
+        replan_history: List of replan reasons from previous iterations
+        previous_result: Previous SummarizerOutput (if available)
 
     Returns:
-        Tuple of (distortion_analysis_json, tool_responses_json)
+        Dict with keys: distortion_analysis, tool_scores, reference_type, prior_answer
     """
-    if not executor_output:
-        return "No evidence available", "No tool responses available"
-
     # Format distortion analysis
-    if executor_output.distortion_analysis:
+    if executor_output and executor_output.distortion_analysis:
         distortion_json = {}
         for obj_name, analyses in executor_output.distortion_analysis.items():
             distortion_json[obj_name] = [
@@ -268,52 +233,8 @@ def format_evidence_for_explanation(executor_output: Optional[ExecutorOutput]) -
     else:
         distortion_text = "No distortion analysis available"
 
-    # Format tool responses
-    if executor_output.quality_scores:
-        tool_json = {}
-        for obj_name, scores in executor_output.quality_scores.items():
-            tool_json[obj_name] = {
-                distortion: {"tool": tool_name, "score": score}
-                for distortion, (tool_name, score) in scores.items()
-            }
-        tool_text = json.dumps(tool_json, indent=2)
-    else:
-        tool_text = "No tool responses available"
-
-    return distortion_text, tool_text
-
-
-def format_evidence_for_scoring(executor_output: Optional[ExecutorOutput]) -> Tuple[str, str]:
-    """
-    Format Executor evidence for scoring mode prompt.
-
-    Args:
-        executor_output: Executor evidence
-
-    Returns:
-        Tuple of (distortion_analysis_json, tool_scores_json)
-    """
-    if not executor_output:
-        return "No evidence available", "No tool scores available"
-
-    # Format distortion analysis (same as explanation mode)
-    if executor_output.distortion_analysis:
-        distortion_json = {}
-        for obj_name, analyses in executor_output.distortion_analysis.items():
-            distortion_json[obj_name] = [
-                {
-                    "type": analysis.type,
-                    "severity": analysis.severity,
-                    "explanation": analysis.explanation
-                }
-                for analysis in analyses
-            ]
-        distortion_text = json.dumps(distortion_json, indent=2)
-    else:
-        distortion_text = "No distortion analysis available"
-
-    # Format tool scores (simpler format for scoring mode)
-    if executor_output.quality_scores:
+    # Format tool scores
+    if executor_output and executor_output.quality_scores:
         tool_json = {}
         for obj_name, scores in executor_output.quality_scores.items():
             tool_json[obj_name] = {
@@ -324,7 +245,31 @@ def format_evidence_for_scoring(executor_output: Optional[ExecutorOutput]) -> Tu
     else:
         tool_text = "No tool scores available"
 
-    return distortion_text, tool_text
+    # Determine reference type
+    reference_type = "Full-Reference" if reference_path else "No-Reference"
+
+    # Format prior answer for replanning iterations
+    if iteration_count > 0 and replan_history:
+        # Get the most recent replan reason
+        latest_reason = replan_history[-1] if replan_history else "Unknown reason"
+
+        if previous_result:
+            prior_answer = (
+                f"Previous answer: {previous_result.final_answer}\n"
+                f"Previous reasoning: {previous_result.quality_reasoning}\n"
+                f"Previous iteration failed because: {latest_reason}"
+            )
+        else:
+            prior_answer = f"Previous iteration failed because: {latest_reason}"
+    else:
+        prior_answer = "This is the first iteration"
+
+    return {
+        "distortion_analysis": distortion_text,
+        "tool_scores": tool_text,
+        "reference_type": reference_type,
+        "prior_answer": prior_answer
+    }
 
 
 # ==================== Replanning Decision Logic ====================
@@ -506,7 +451,7 @@ def summarizer_node(
         query_type_detected = detect_query_type(query, vlm_client=vlm_client)
         logger.info(f"Detected query type: {query_type_detected.value}")
 
-        # Extract all tool scores for fusion (used in multiple modes)
+        # Extract all tool scores for fusion (used in scoring mode)
         all_scores = []
         if executor_output and executor_output.quality_scores:
             for obj_scores in executor_output.quality_scores.values():
@@ -514,55 +459,33 @@ def summarizer_node(
                     all_scores.append(score)
         tool_mean = sum(all_scores) / len(all_scores) if all_scores else 3.0
 
-        # Select prompt mode and format evidence
-        if plan.task_type == "IQA" and query_type_detected == QueryType.MCQ:
-            # MCQ MODE: Categorical selection, final_answer is letter
-            logger.info("Using MCQ mode (categorical selection)")
-            distortion_text, tool_text = format_evidence_for_explanation(executor_output)
+        # Get iteration context for prior answer
+        iteration_count = state.get("iteration_count", 0)
+        replan_history = state.get("replan_history", [])
+        previous_result = state.get("summarizer_result")  # May be None on first iteration
 
-            prompt = EXPLANATION_PROMPT_TEMPLATE.format(
-                query=query,
-                distortion_analysis=distortion_text,
-                tool_responses=tool_text
-            )
+        # Format evidence using unified function (per paper specification)
+        evidence = format_evidence_unified(
+            executor_output=executor_output,
+            reference_path=reference_path,
+            iteration_count=iteration_count,
+            replan_history=replan_history,
+            previous_result=previous_result
+        )
 
-            apply_fusion = False
-            tool_scores_for_fusion = []
+        logger.info(f"Using unified prompt template (paper specification)")
+        logger.info(f"Reference type: {evidence['reference_type']}")
+        if iteration_count > 0:
+            logger.info(f"Replanning iteration {iteration_count}, prior answer included")
 
-        elif plan.task_type == "IQA" and query_type_detected == QueryType.SCORING:
-            # SCORING MODE: Request probability distributions and apply fusion
-            # final_answer is numerical score
-            logger.info("Using SCORING mode with fusion")
-            distortion_text, tool_text = format_evidence_for_scoring(executor_output)
-
-            logger.info(f"Tool scores: {all_scores}, mean: {tool_mean:.2f}")
-
-            prompt = SCORING_WITH_FUSION_PROMPT_TEMPLATE.format(
-                query=query,
-                distortion_analysis=distortion_text,
-                tool_scores=tool_text,
-                tool_mean=tool_mean
-            )
-
-            # Flag to apply fusion after VLM response
-            apply_fusion = True
-            tool_scores_for_fusion = all_scores
-
-        else:
-            # EXPLANATION MODE: Answer question in quality_reasoning, letter grade in final_answer
-            # final_answer is letter grade (A-E), quality_reasoning contains the actual answer
-            logger.info("Using EXPLANATION mode (answer in quality_reasoning, letter grade in final_answer)")
-            distortion_text, tool_text = format_evidence_for_explanation(executor_output)
-
-            prompt = EXPLANATION_PROMPT_TEMPLATE.format(
-                query=query,
-                distortion_analysis=distortion_text,
-                tool_responses=tool_text
-            )
-
-            # For EXPLANATION queries, we use letter grade as final_answer
-            apply_fusion = False
-            tool_scores_for_fusion = all_scores
+        # Render unified prompt template
+        prompt = PAPER_UNIFIED_PROMPT_TEMPLATE.format(
+            query=query,
+            distortion_analysis=evidence["distortion_analysis"],
+            tool_scores=evidence["tool_scores"],
+            reference_type=evidence["reference_type"],
+            prior_answer=evidence["prior_answer"]
+        )
 
         logger.debug(f"Prompt length: {len(prompt)} characters")
 
@@ -579,88 +502,94 @@ def summarizer_node(
                 )
                 logger.debug(f"VLM response: {vlm_response[:500]}")
 
-                # Parse JSON with automatic extraction
+                # Parse JSON with automatic extraction (unified format: quality_reasoning + final_answer)
                 response_data = parse_json_response(vlm_response)
 
-                # Determine output format based on query type and apply fusion if needed
-                if query_type_detected == QueryType.MCQ:
-                    # MCQ MODE: final_answer is letter, quality_score is None
-                    if "final_answer" not in response_data or "quality_reasoning" not in response_data:
-                        raise ValueError("Missing required fields in VLM response")
+                # Validate required fields from unified prompt
+                if "final_answer" not in response_data or "quality_reasoning" not in response_data:
+                    raise ValueError("Missing required fields (final_answer, quality_reasoning) in VLM response")
 
-                    final_answer = response_data["final_answer"]
+                vlm_final_answer = response_data["final_answer"]
+                quality_reasoning = response_data["quality_reasoning"]
+
+                # Interpret final_answer based on detected query type
+                if query_type_detected == QueryType.MCQ:
+                    # MCQ MODE: Extract letter from final_answer
+                    final_answer = str(vlm_final_answer).strip()
+                    # Extract first letter if answer contains more text
+                    if final_answer and final_answer[0].upper() in "ABCDE":
+                        final_answer = final_answer[0].upper()
                     quality_score = None
-                    quality_reasoning = response_data["quality_reasoning"]
                     logger.info(f"MCQ output: final_answer={final_answer} (letter)")
 
                 elif query_type_detected == QueryType.SCORING:
-                    # SCORING MODE: Apply fusion, final_answer is numerical score
-                    logger.info("Applying score fusion for SCORING query")
+                    # SCORING MODE: Apply fusion with tool scores
+                    logger.info("Processing SCORING query with unified prompt")
 
-                    if "quality_probs" not in response_data and "quality_reasoning" not in response_data:
-                        raise ValueError("Missing quality_probs and quality_reasoning in VLM response")
-
-                    # Create ScoreFusion instance
                     fusion = ScoreFusion(eta=1.0)
 
-                    # Extract VLM probabilities
-                    vlm_probs = fusion.extract_vlm_probs(response_data)
+                    # Try to extract numerical score from VLM's final_answer
+                    vlm_score = None
+                    try:
+                        # Check if final_answer is already a number
+                        vlm_score = float(vlm_final_answer)
+                    except (ValueError, TypeError):
+                        # Try to extract from quality level text
+                        vlm_answer_str = str(vlm_final_answer).lower()
+                        level_map = {"excellent": 5, "good": 4, "fair": 3, "poor": 2, "bad": 1}
+                        for level_name, level_score in level_map.items():
+                            if level_name in vlm_answer_str:
+                                vlm_score = float(level_score)
+                                break
 
-                    # Apply fusion formula
-                    if tool_scores_for_fusion:
-                        fused_score = fusion.fuse(tool_scores_for_fusion, vlm_probs)
-                        logger.info(f"Fused score: {fused_score:.3f}")
+                    # Construct VLM probability distribution (softened around detected level)
+                    if vlm_score is not None:
+                        # Use softened distribution centered on VLM's indicated level
+                        vlm_level = max(1, min(5, round(vlm_score)))
+                        vlm_probs = {}
+                        for c in [1, 2, 3, 4, 5]:
+                            # Gaussian-like softening around the selected level
+                            vlm_probs[c] = max(0.01, 1.0 - 0.3 * abs(c - vlm_level))
+                        # Normalize
+                        total = sum(vlm_probs.values())
+                        vlm_probs = {c: p / total for c, p in vlm_probs.items()}
                     else:
-                        # No tool scores: use VLM probs only
-                        fused_score = sum(c * vlm_probs[c] for c in [1, 2, 3, 4, 5])
-                        logger.warning(f"No tool scores, using VLM probs only: {fused_score:.3f}")
+                        # Default to uniform distribution
+                        vlm_probs = {c: 0.2 for c in [1, 2, 3, 4, 5]}
+
+                    # Apply fusion formula with tool scores
+                    if all_scores:
+                        fused_score = fusion.fuse(all_scores, vlm_probs)
+                        logger.info(f"Fused score: {fused_score:.3f} (tools: {all_scores}, vlm_score: {vlm_score})")
+                    else:
+                        # No tool scores: use VLM assessment directly
+                        fused_score = vlm_score if vlm_score else 3.0
+                        logger.warning(f"No tool scores, using VLM score: {fused_score:.3f}")
 
                     # Clip to [1.0, 5.0] range
                     fused_score = max(1.0, min(5.0, fused_score))
 
-                    # Set final_answer and quality_score
                     final_answer = fused_score
                     quality_score = fused_score
-                    quality_reasoning = response_data.get("quality_reasoning", "Score computed from fusion")
                     logger.info(f"SCORING output: final_answer={final_answer:.3f} (numerical)")
 
                 else:
-                    # EXPLANATION MODE: VLM answer goes to quality_reasoning, final_answer is letter grade
-                    logger.info("Processing EXPLANATION query: mapping tool mean to letter grade for final_answer")
+                    # EXPLANATION MODE: Use VLM's direct answer
+                    logger.info("Processing EXPLANATION query with unified prompt")
 
-                    if "final_answer" not in response_data or "quality_reasoning" not in response_data:
-                        raise ValueError("Missing required fields in VLM response")
+                    # final_answer is VLM's direct response to the query
+                    final_answer = str(vlm_final_answer)
 
-                    # VLM's answer is incorporated into quality_reasoning
-                    vlm_answer = response_data["final_answer"]
-                    vlm_reasoning = response_data["quality_reasoning"]
-
-                    # Combine VLM's answer with reasoning
-                    quality_reasoning = f"{vlm_answer}. {vlm_reasoning}"
-
-                    # Compute tool mean and map to letter grade
-                    fusion = ScoreFusion(eta=1.0)
-
-                    if tool_scores_for_fusion:
-                        tool_score = sum(tool_scores_for_fusion) / len(tool_scores_for_fusion)
-                        tool_score = max(1.0, min(5.0, tool_score))  # Clip to [1.0, 5.0]
-                        logger.info(f"Tool mean for EXPLANATION: {tool_score:.3f}")
+                    # Compute quality_score from tool mean for reference
+                    if all_scores:
+                        quality_score = sum(all_scores) / len(all_scores)
+                        quality_score = max(1.0, min(5.0, quality_score))
                     else:
-                        # No tool scores: use neutral score
-                        tool_score = 3.0
-                        logger.warning("No tool scores, using neutral score 3.0")
+                        quality_score = None
 
-                    # Map numerical score to quality level and letter grade
-                    quality_level = fusion.map_to_level(tool_score)
-                    letter_grade = fusion.map_to_letter(quality_level)
+                    logger.info(f"EXPLANATION output: final_answer={final_answer[:50]}..., quality_score={quality_score}")
 
-                    # final_answer is letter grade (paper requirement for non-scoring queries)
-                    final_answer = letter_grade
-                    quality_score = tool_score
-                    logger.info(f"EXPLANATION output: final_answer={final_answer} (letter), quality_score={quality_score:.3f}, answer in quality_reasoning")
-
-                # Check evidence sufficiency
-                iteration_count = state.get("iteration_count", 0)
+                # Check evidence sufficiency (iteration_count already retrieved above)
                 max_replan_iterations = state.get("max_replan_iterations", 2)
 
                 need_replan, replan_reason = check_evidence_sufficiency(
@@ -687,20 +616,21 @@ def summarizer_node(
                 # not here. We only report whether replanning is needed.
 
                 # Update replan history only if replanning is needed
-                replan_history = state.get("replan_history", [])
+                # (replan_history was already retrieved earlier for evidence formatting)
+                updated_replan_history = list(replan_history)  # Make a copy
                 if need_replan:
                     history_entry = f"[Iteration {iteration_count}] {replan_reason}"
-                    replan_history.append(history_entry)
+                    updated_replan_history.append(history_entry)
                     # Limit history size
-                    if len(replan_history) > 10:
+                    if len(updated_replan_history) > 10:
                         logger.warning("Replan history exceeds 10 entries, trimming oldest")
-                        replan_history = replan_history[-10:]
+                        updated_replan_history = updated_replan_history[-10:]
 
                 logger.info("Summarizer completed successfully")
 
                 return {
                     "summarizer_result": summarizer_output,
-                    "replan_history": replan_history
+                    "replan_history": updated_replan_history
                 }
 
             except json.JSONDecodeError as e:
